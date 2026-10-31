@@ -38,6 +38,7 @@ struct GifSlot {
   uint8_t fitMode = 255;                             // LED4YOU: 0 in proportion, 1 stretched, 2 filling the matrix (cut)
   uint8_t* fitTag = nullptr; uint8_t fitFrame = 1; // LED4YOU: frame each LED was last painted in (smaller than the GIF: keep the brightest pixel)
   GifPixelCb drawCb = nullptr;                     // pixel callback that fits this GIF and segment size
+  bool hasDec = false;                             // LED4YOU: decoder allocated
 };
 static GifSlot slots[L4Y_GIF_SLOTS];
 static GifSlot* cur = slots;                       // the slot the callbacks below work on
@@ -183,9 +184,22 @@ static void l4yFit(GifSlot& sl, Segment& seg) {
 #define IMAGE_ERROR_WAITING 254
 #define IMAGE_ERROR_PREV 255
 
+#ifdef L4Y_GIF_SHARED_SCRATCH
+// LED4YOU: all GIFs share one decoder working area (AnimatedGIF patched, see usermods/led4you_ble/patches): it is
+// freed when no GIF is open, so it only takes memory while GIFs play
+static void l4yScratchTidy() {
+  for (auto& s : slots) if (s.hasDec) return;
+  free(l4yGifScratch); l4yGifScratch = nullptr;
+}
+#endif
+
 static void freeSlot(GifSlot& sl) {
   if (sl.file) sl.file.close();
   sl.decoder.dealloc();
+  sl.hasDec = false;
+#ifdef L4Y_GIF_SHARED_SCRATCH
+  l4yScratchTidy();
+#endif
   sl.failed = false;
   sl.seg = nullptr;
   strcpy(sl.lastFilename, "/");  // reset filename
@@ -261,9 +275,19 @@ byte renderImageToSegment(Segment &seg) {
     // decoder first, then only allocate when one free block is big enough (with room left for Bluetooth and Wi-Fi);
     // otherwise skip the GIF and try again a second later.
     sl.decoder.dealloc();
+    sl.hasDec = false;
+#ifdef L4Y_GIF_SHARED_SCRATCH
+    const size_t scr = l4yGifScratch ? 0 : sizeof(L4YGIFSCRATCH);   // the shared working area, if not there yet
+#else
+    const size_t scr = 0;
+#endif
 #ifdef ARDUINO_ARCH_ESP32
-    if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 512 ||
-        heap_caps_get_free_size(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 16384) {   // LED4YOU: 16 KB left over (the low-memory guard only acts under 10 KB)
+    if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < max(sizeof(AnimatedGIF), scr) + 512 ||
+        heap_caps_get_free_size(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + scr + 16384
+#ifdef L4Y_GIF_SHARED_SCRATCH
+        || (!l4yGifScratch && !(l4yGifScratch = (L4YGIFSCRATCH*)malloc(sizeof(L4YGIFSCRATCH))))
+#endif
+        ) {   // LED4YOU: 16 KB left over (the low-memory guard only acts under 10 KB)
 #else
     if (ESP.getMaxFreeBlockSize() < sizeof(AnimatedGIF) + 512) {
 #endif
@@ -278,6 +302,7 @@ byte renderImageToSegment(Segment &seg) {
     try {
 #endif
     sl.decoder.alloc(); // this function may throw out-of memory and cause a crash
+    sl.hasDec = true;
 #if __cpp_exceptions
     } catch (...) {  // if we arrive here, the decoder has thrown an OOM exception
       sl.failed = true;

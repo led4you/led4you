@@ -14,3 +14,14 @@ Hardware-SPI LED types (APA102 etc.) cannot be used together with it on the C3.
 
 Copy this file over `NeoPixelBus/src/internal/methods/NeoEsp32RmtMethod.h` in the library
 folder used by PlatformIO before building `led4you_c3`.
+
+# AnimatedGIF patch for LED4YOU on the classic ESP32 (v84)
+
+`AnimatedGIF/` holds `AnimatedGIF.h`, `AnimatedGIF.cpp` and `gif.inl` from bitbank2/AnimatedGIF 1.4.7 with one
+change, active only with `-D L4Y_GIF_SHARED_SCRATCH` (set for `led4you_esp32`): the big decoder buffers (line,
+file, local palette, LZW data and table, pixel stack, ~23 KB) are only used while one call decodes a whole frame,
+so they move out of each decoder into one shared area, `l4yGifScratch`. Each open GIF keeps only its global
+palette and file position (~1 KB), so two or three GIFs (one per matrix) fit next to Bluetooth and Wi-Fi.
+`wled00/image_loader.cpp` allocates the area before the first GIF and frees it when no GIF is open.
+
+Copy the three files over `AnimatedGIF/src/` in the library folder used by PlatformIO before building `led4you_esp32`.
