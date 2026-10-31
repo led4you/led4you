@@ -17,6 +17,8 @@
 #ifndef L4Y_GIF_SLOTS
   #if defined(LED4YOU_BLE) && !defined(CONFIG_IDF_TARGET_ESP32C3)
     #define L4Y_GIF_SLOTS 3
+  #elif defined(LED4YOU_BLE) && defined(L4Y_GIF_SHARED_SCRATCH)
+    #define L4Y_GIF_SLOTS 2                        // C3 with the shared decoder working area: each more GIF needs ~1 KB
   #else
     #define L4Y_GIF_SLOTS 1
   #endif
