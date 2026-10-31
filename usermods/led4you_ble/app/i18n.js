@@ -686,6 +686,12 @@
 		['Every light on your Wi-Fi. Give each one a clear name (Roof, Garden tree, Window…). The icons show which house scenes each light already has (bright = saved).', 'Todas as luzes do teu Wi-Fi. Dá a cada uma um nome claro (Telhado, Árvore do jardim, Janela…). Os ícones mostram que cenas cada luz já tem (aceso = guardada).', 'Todas las luces de tu Wi-Fi. Dale a cada una un nombre claro (Tejado, Árbol del jardín, Ventana…). Los iconos muestran qué escenas tiene cada luz (encendido = guardada).', 'Toutes les lumières de votre Wi-Fi. Donnez à chacune un nom clair (Toit, Arbre du jardin, Fenêtre…). Les icônes montrent les scènes déjà enregistrées (allumée = enregistrée).'],
 		// --- firmware update ---
 		['Update available', 'Atualização disponível', 'Actualización disponible', 'Mise à jour disponible'],
+		['Delete all GIFs', 'Apagar todos os GIF', 'Borrar todos los GIF', 'Supprimer tous les GIF'],
+		['Tap again to delete every GIF', 'Toca outra vez para apagar todos os GIF', 'Toca otra vez para borrar todos los GIF', 'Touchez encore pour supprimer tous les GIF'],
+		['Deleting the GIFs…', 'A apagar os GIF…', 'Borrando los GIF…', 'Suppression des GIF…'],
+		['Some GIFs could not be deleted.', 'Alguns GIF não puderam ser apagados.', 'Algunos GIF no se pudieron borrar.', 'Certains GIF n’ont pas pu être supprimés.'],
+		['All GIFs deleted.', 'Todos os GIF foram apagados.', 'Todos los GIF se borraron.', 'Tous les GIF ont été supprimés.'],
+		['GIFs that are playing now stop when they are deleted.', 'Os GIF que estão a tocar param quando são apagados.', 'Los GIF que se están reproduciendo se detienen al borrarlos.', 'Les GIF en cours s’arrêtent quand ils sont supprimés.'],
 		['Update now', 'Atualizar agora', 'Actualizar ahora', 'Mettre à jour'],
 		['Tap again to start', 'Toca outra vez para começar', 'Toca de nuevo para empezar', 'Touchez encore pour commencer'],
 		['Do not switch the lights off during the update.', 'Não desligues as luzes durante a atualização.', 'No apagues las luces durante la actualización.', 'N’éteignez pas les lumières pendant la mise à jour.'],
