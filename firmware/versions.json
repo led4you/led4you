@@ -1,3 +1,3 @@
-[{ "version": 85, "manifest": "manifest-v85.json", "notes": "ESP32-C3: two GIFs at the same time, one per matrix (shared decoder working area, as on the classic ESP32 in v84)" },
- { "version": 84, "manifest": "manifest-v84.json", "notes": "Classic ESP32: a GIF on each matrix at the same time (the GIFs share one decoder working area)" },
- { "version": 83, "manifest": "manifest-v83.json", "notes": "Classic ESP32: no more random colours with Bluetooth on (first LED output sent with I2S + DMA)" }]
+[{ "version": 86, "manifest": "manifest-v86.json", "notes": "GIFs need much less memory (a 16x16 GIF ~7 KB instead of ~23 KB): GIFs and text with Bluetooth on" },
+ { "version": 85, "manifest": "manifest-v85.json", "notes": "ESP32-C3: two GIFs at the same time, one per matrix (shared decoder working area, as on the classic ESP32 in v84)" },
+ { "version": 84, "manifest": "manifest-v84.json", "notes": "Classic ESP32: a GIF on each matrix at the same time (the GIFs share one decoder working area)" }]
