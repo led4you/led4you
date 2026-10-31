@@ -1339,6 +1339,7 @@
 					const sent = zl.length;
 					t.refresh && setTimeout(() => t.refresh().then(() => {
 						load();
+						targetListeners.forEach(f => f()); try { window.dispatchEvent(new Event('l4yzones')); } catch (e) {}
 						const got = (inf().zg || []).length;
 						if (got && got < sent) { const m = 'The lights made only ' + got + ' of the ' + sent + ' zones: not enough memory on this board. Use fewer zones (for example one per output) or fewer LEDs.'; msg.textContent = m; toast(m); }
 					}), 1500);
@@ -1909,7 +1910,8 @@
 		targetBar,
 		segOut,
 		target: () => TARGET,
-		redrawTargets: () => targetListeners.forEach(f => f()),
+		// new zones: redraw every "Send to" row and tell other views ("See it") to read the zones again
+		redrawTargets: () => { targetListeners.forEach(f => f()); try { window.dispatchEvent(new Event('l4yzones')); } catch (e) {} },
 		// the zones of the lights with their names and LED counts (for the "See it" picture)
 		zoneList: t => { const i = t.info(), mx = i.mw && i.mh, area = mx ? i.mw * i.mh : 0;
 			return (i.zg || []).map((z, k) => { const strip = !mx || z[1] >= area;
