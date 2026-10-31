@@ -160,6 +160,8 @@
 			opts.send({ on: true, seg: linked.map(z => ({ id: z.rz, on: true, fx: z.fx, col: z.col, pal: z.pal, sx: z.sx })) })
 				.then(() => opts.toast && opts.toast('Sent ' + linked.length + ' part(s) to their zones.')).catch(() => opts.toast && opts.toast('Could not send it to the lights.'));
 		};
+		// zones saved elsewhere (Setup › Zones): show the new list in the editor of the part on screen
+		window.addEventListener('l4yzones', () => { if (cv.isConnected && ed.isConnected) { zones.forEach(fitReal); editor(); } });
 		const build = () => {
 			const old = saved[sc.id] || [];
 			zones = sc.zones.map((z, i) => {
