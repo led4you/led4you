@@ -263,7 +263,7 @@ byte renderImageToSegment(Segment &seg) {
     sl.decoder.dealloc();
 #ifdef ARDUINO_ARCH_ESP32
     if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 512 ||
-        heap_caps_get_free_size(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 20480) {   // LED4YOU: leaves 20 KB for Bluetooth, Wi-Fi and the other zones
+        heap_caps_get_free_size(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 16384) {   // LED4YOU: 16 KB left over (the low-memory guard only acts under 10 KB)
 #else
     if (ESP.getMaxFreeBlockSize() < sizeof(AnimatedGIF) + 512) {
 #endif
