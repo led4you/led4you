@@ -1,3 +1,3 @@
-[{ "version": 82, "manifest": "manifest-v82.json", "notes": "GIFs start again with two matrices and Bluetooth on (v81 asked for too much free memory and left them black)" },
- { "version": 81, "manifest": "manifest-v81.json", "notes": "GIFs on several matrices (zones) no longer leave a matrix black or freeze the board; GIFs stop first when memory runs low" },
- { "version": 80, "manifest": "manifest-v80.json", "notes": "Drawings stay on the lights: the stored drawing no longer goes dark about 10 s after drawing (with Bluetooth on)" }]
+[{ "version": 83, "manifest": "manifest-v83.json", "notes": "Classic ESP32: no more random colours with Bluetooth on (first LED output sent with I2S + DMA)" },
+ { "version": 82, "manifest": "manifest-v82.json", "notes": "GIFs start again with two matrices and Bluetooth on (v81 asked for too much free memory and left them black)" },
+ { "version": 81, "manifest": "manifest-v81.json", "notes": "GIFs on several matrices (zones) no longer leave a matrix black or freeze the board; GIFs stop first when memory runs low" }]
