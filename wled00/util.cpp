@@ -816,7 +816,13 @@ void *d_realloc_malloc(void *ptr, size_t size) {
 static void *validateFreeHeap(void *buffer) {
   // make sure there is enough free heap left if buffer was allocated in DRAM region, free it if not
   // TODO: between allocate and free, heap can run low (async web access), only IDF V5 allows for a pre-allocation-check of all free blocks
+#ifdef LED4YOU_BLE
+  // LED4YOU: with Bluetooth on and a GIF playing, the largest free block is often under 15 KB while plenty of memory
+  // is free; refusing every buffer then left zones without their pixel buffer (black) and drawings dark
+  if ((uintptr_t)buffer > SOC_DRAM_LOW && (uintptr_t)buffer < SOC_DRAM_HIGH && (getContiguousFreeHeap() < 6 * 1024 || getFreeHeapSize() < 12 * 1024)) {
+#else
   if ((uintptr_t)buffer > SOC_DRAM_LOW && (uintptr_t)buffer < SOC_DRAM_HIGH && getContiguousFreeHeap() < MIN_HEAP_SIZE) {
+#endif
     free(buffer);
     return nullptr;
   }

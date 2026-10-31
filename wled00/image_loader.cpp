@@ -196,12 +196,26 @@ static void freeSlot(GifSlot& sl) {
 #endif
 }
 
-// the slot of this segment, or a free one, or one whose segment failed / became inactive
+// LED4YOU: a slot only belongs to a segment that is still in the strip's list and still plays the Image effect.
+// A slot's segment can disappear (zones changed, or the temporary copy WLED renders the old effect on during a
+// transition is deleted): its pointer must then never be used again, and the slot is freed. Before this, a GIF
+// that was switched to another effect kept the only C3 slot, so the other matrix stayed black, and on the ESP32
+// a slot could point to a deleted copy and freeze the board.
+static bool segInStrip(const Segment* p) {
+  for (unsigned i = 0; i < strip.getSegmentsNum(); i++) if (&strip.getSegment(i) == p) return true;
+  return false;
+}
+static bool slotInUse(const GifSlot& sl) {
+  return sl.seg && segInStrip(sl.seg) && sl.seg->isActive() && sl.seg->mode == FX_MODE_IMAGE && !sl.failed;
+}
+
+// the slot of this segment, or a free one, or one whose segment failed / stopped playing a GIF / is gone
 static GifSlot* slotFor(Segment& seg) {
+  if (!segInStrip(&seg)) return nullptr;            // temporary copy during a transition: never takes a slot
   for (auto& sl : slots) if (sl.seg == &seg) return &sl;
   if (!seg.isActive()) return nullptr;              // sanity check: calling segment must be active
   for (auto& sl : slots) if (!sl.seg) { sl.seg = &seg; return &sl; }
-  for (auto& sl : slots) if (sl.failed || !sl.seg->isActive()) { freeSlot(sl); sl.seg = &seg; return &sl; }
+  for (auto& sl : slots) if (!slotInUse(sl)) { freeSlot(sl); sl.seg = &seg; return &sl; }
   return nullptr;                                   // all slots busy
 }
 
@@ -211,7 +225,7 @@ byte renderImageToSegment(Segment &seg) {
   // disable during effect transition, causes flickering, multiple allocations and depending on image, part of old FX remaining
   //if (seg.mode != seg.currentMode()) return IMAGE_ERROR_WAITING;
   GifSlot* sp = slotFor(seg);
-  if (!sp) return IMAGE_ERROR_SEG_LIMIT;           // no free slot: another segment already shows a GIF
+  if (!sp) return segInStrip(&seg) ? IMAGE_ERROR_SEG_LIMIT : IMAGE_ERROR_WAITING;   // no free slot / transition copy
   GifSlot& sl = *sp;
   cur = sp;
   if (sl.retryAt) { if ((long)(millis() - sl.retryAt) < 0) return IMAGE_ERROR_WAITING; sl.retryAt = 0; }
@@ -249,7 +263,7 @@ byte renderImageToSegment(Segment &seg) {
     sl.decoder.dealloc();
 #ifdef ARDUINO_ARCH_ESP32
     if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 512 ||
-        heap_caps_get_free_size(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 16384) {
+        heap_caps_get_free_size(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + 20480) {   // LED4YOU: leaves 20 KB for Bluetooth, Wi-Fi and the other zones
 #else
     if (ESP.getMaxFreeBlockSize() < sizeof(AnimatedGIF) + 512) {
 #endif

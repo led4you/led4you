@@ -185,14 +185,23 @@ void WLED::loop()
 #ifdef LED4YOU_BLE
     // LED4YOU: a playing GIF holds one 22 KB block, so with Bluetooth and Wi-Fi on the largest free block can be
     // under 14 KB while plenty of memory is free. WLED would then switch every effect to Static after 15 s (a GIF
-    // turns dark). Only step in when memory is really short.
-    if (heap < 6 * 1024 || getFreeHeapSize() < MIN_HEAP_SIZE) heapDanger+=5;
+    // turns dark). Only step in when memory is really short (Bluetooth and Wi-Fi work with less than WLED's 15 KB).
+    if (heap < 4 * 1024 || getFreeHeapSize() < 10 * 1024) heapDanger+=5;
 #else
     if (heap < MIN_HEAP_SIZE - 1024) heapDanger+=5; // allow 1k of "wiggle room" for things that do not respect min heap limits
 #endif
     else heapDanger = 0;
     switch (heapDanger) {
       case 15: // 15 consecutive seconds
+#ifdef LED4YOU_BLE
+        // LED4YOU: a playing GIF holds the biggest block (~22 KB): stop the GIFs first and leave the other effects
+        {
+          bool gif = false;
+          for (unsigned i = 0; i < strip.getSegmentsNum(); i++)
+            if (strip.getSegments()[i].mode == FX_MODE_IMAGE) { strip.getSegments()[i].setMode(FX_MODE_STATIC); gif = true; }
+          if (gif) { heapDanger = 0; errorFlag = ERR_NORAM; break; }
+        }
+#endif
         DEBUG_PRINTLN(F("Heap low, purging segments"));
         strip.purgeSegments();
         strip.setTransition(0); // disable transitions
