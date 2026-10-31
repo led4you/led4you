@@ -1,3 +1,3 @@
-[{ "version": 83, "manifest": "manifest-v83.json", "notes": "Classic ESP32: no more random colours with Bluetooth on (first LED output sent with I2S + DMA)" },
- { "version": 82, "manifest": "manifest-v82.json", "notes": "GIFs start again with two matrices and Bluetooth on (v81 asked for too much free memory and left them black)" },
- { "version": 81, "manifest": "manifest-v81.json", "notes": "GIFs on several matrices (zones) no longer leave a matrix black or freeze the board; GIFs stop first when memory runs low" }]
+[{ "version": 84, "manifest": "manifest-v84.json", "notes": "Classic ESP32: a GIF on each matrix at the same time (the GIFs share one decoder working area)" },
+ { "version": 83, "manifest": "manifest-v83.json", "notes": "Classic ESP32: no more random colours with Bluetooth on (first LED output sent with I2S + DMA)" },
+ { "version": 82, "manifest": "manifest-v82.json", "notes": "GIFs start again with two matrices and Bluetooth on (v81 asked for too much free memory and left them black)" }]
