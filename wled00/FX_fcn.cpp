@@ -1207,6 +1207,17 @@ void WS2812FX::finalizeInit() {
   // TODO: ideally we would free everything segment related here to reduce fragmentation (pixel buffers, ledamp, segments, etc) but that somehow leads to heap corruption if touchig any of the buffers.
   unsigned digitalCount = 0;
   #if defined(ARDUINO_ARCH_ESP32) && !defined(CONFIG_IDF_TARGET_ESP32C3)
+  #if defined(LED4YOU_BLE) && defined(CONFIG_IDF_TARGET_ESP32)
+  // LED4YOU, classic ESP32: the first LED output is sent with I2S + DMA (from RAM, no CPU help). With Bluetooth on,
+  // the standard RMT driver is refilled by an interrupt that comes late and LEDs show random colours; the
+  // high-priority RMT driver that avoided it crashed the board at start together with Bluetooth. Only the first
+  // output: two or more I2S outputs need parallel I2S, which takes 8 times the DMA memory.
+  {
+    bool first = true;
+    for (auto &bus : busConfigs)
+      if (Bus::isDigital(bus.type) && !Bus::is2Pin(bus.type)) { bus.driverType = first ? 1 : 0; first = false; }
+  }
+  #endif
   // validate the bus config: count I2S buses and check if they meet requirements
   unsigned i2sBusCount = 0;
 
