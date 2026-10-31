@@ -635,8 +635,8 @@ static_assert(WLED_MAX_BUSSES <= 32, "WLED_MAX_BUSSES exceeds hard limit");
 #ifdef ESP8266
   #define JSON_BUFFER_SIZE 10240
 #else
-  #if defined(CONFIG_IDF_TARGET_ESP32S2)
-    #define JSON_BUFFER_SIZE 24576
+  #if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(LED4YOU_BLE)
+    #define JSON_BUFFER_SIZE 24576   // LED4YOU: as WLED does on the ESP32-S2 (same RAM): 8 KB more free memory for Bluetooth, GIFs and Wi-Fi
   #else
     #define JSON_BUFFER_SIZE 32767
   #endif
