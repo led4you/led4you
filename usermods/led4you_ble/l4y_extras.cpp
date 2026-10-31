@@ -13,7 +13,7 @@
 #include "wled.h"
 #include <WiFiUdp.h>
 
-#define L4Y_FW_VERSION 88      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
+#define L4Y_FW_VERSION 89      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
 #define L4Y_HOUSE_PORT 21329   // UDP port for house scenes ("L4YS" packets)
 extern const int l4yFwVersion = L4Y_FW_VERSION;   // shown by Improv (installer, Wi-Fi setup) as "v.."
 
@@ -193,35 +193,50 @@ class Led4youExtras : public Usermod {
       txScene = n; txSeq++; txLeft = 3; txNext = millis();
     }
 
-    // "Play all" from the GIF pack: the main segment plays every stored GIF whose name starts with gifRotPrefix
-    // (hw- Halloween, xm- Christmas, ev- other), a new one every gifRotSec seconds. Stops when another effect is chosen.
-    char gifRotPrefix[8] = "";
-    uint16_t gifRotSec = 0;
-    uint32_t gifRotNext = 0;
-    int gifRotSeg = -1;      // segment (zone / panel) that rotates, -1 = main segment
+    // "Play all" from the GIF pack: a zone plays every stored GIF whose name starts with a prefix (hw- Halloween,
+    // xm- Christmas, ev- other), a new one every few seconds. Each zone (matrix panel) can have its own rotation
+    // (v89; before, starting it on a second matrix stopped it on the first). Stops when the zone gets another effect.
+    struct GifRot { char p[8]; uint16_t sec; uint32_t next; int seg; };   // seg -1 = main segment, sec 0 = unused
+    static const int L4Y_ROTS = 4;
+    GifRot gifRots[L4Y_ROTS] = {};
+    void setGifRot(int segId, const char* prefix, int sec) {
+      GifRot* r = nullptr;
+      for (auto& g : gifRots) if (g.sec && g.seg == segId) r = &g;
+      if (!prefix[0]) { if (r) r->sec = 0; return; }
+      if (!r) for (auto& g : gifRots) if (!g.sec) { r = &g; break; }
+      if (!r) r = &gifRots[0];
+      strlcpy(r->p, prefix, sizeof(r->p));
+      r->sec = constrain(sec, 3, 600);
+      r->seg = segId;
+      r->next = millis() + r->sec * 1000UL + (r - gifRots) * 250UL;   // a little apart, so two zones do not change at once
+    }
+    void stopGifRot(int segId) { for (auto& g : gifRots) if (g.sec && g.seg == segId) g.sec = 0; }
     void runGifRotation() {
-      if (!gifRotSec || (long)(millis() - gifRotNext) < 0) return;
-      gifRotNext = millis() + gifRotSec * 1000UL;
-      if (gifRotSeg >= (int)strip.getSegmentsNum()) { gifRotSec = 0; return; }
-      Segment& seg = gifRotSeg >= 0 ? strip.getSegment(gifRotSeg) : strip.getMainSegment();
-      if (seg.mode != FX_MODE_IMAGE) { gifRotSec = 0; return; }
-      const char* cur = seg.name ? seg.name : "";
-      String first, next;
-      File root = WLED_FS.open("/");
-      File f = root.openNextFile();
-      while (f) {
-        String n = f.name();
-        f.close();
-        if (n.startsWith("/")) n = n.substring(1);
-        if (n.startsWith(gifRotPrefix) && n.endsWith(".gif")) {
-          if (!first.length() || n < first) first = n;                                   // alphabetical order
-          if (strcmp(n.c_str(), cur) > 0 && (!next.length() || n < next)) next = n;
+      for (auto& g : gifRots) {
+        if (!g.sec || (long)(millis() - g.next) < 0) continue;
+        g.next = millis() + g.sec * 1000UL;
+        if (g.seg >= (int)strip.getSegmentsNum()) { g.sec = 0; continue; }
+        Segment& seg = g.seg >= 0 ? strip.getSegment(g.seg) : strip.getMainSegment();
+        if (seg.mode != FX_MODE_IMAGE) { g.sec = 0; continue; }
+        const char* cur = seg.name ? seg.name : "";
+        String first, next;
+        File root = WLED_FS.open("/");
+        File f = root.openNextFile();
+        while (f) {
+          String n = f.name();
+          f.close();
+          if (n.startsWith("/")) n = n.substring(1);
+          if (n.startsWith(g.p) && n.endsWith(".gif")) {
+            if (!first.length() || n < first) first = n;                                   // alphabetical order
+            if (strcmp(n.c_str(), cur) > 0 && (!next.length() || n < next)) next = n;
+          }
+          f = root.openNextFile();
         }
-        f = root.openNextFile();
+        root.close();
+        if (!next.length()) next = first;                                                   // back to the start
+        if (next.length() && strcmp(next.c_str(), cur) != 0) seg.setName(next);
+        return;   // at most one zone changes per pass: the next one follows on the next loop
       }
-      root.close();
-      if (!next.length()) next = first;                                                   // back to the start
-      if (next.length() && strcmp(next.c_str(), cur) != 0) seg.setName(next);
     }
 
     void runHouse() {
@@ -499,11 +514,16 @@ class Led4youExtras : public Usermod {
       // GIF rotation: started with {"l4y":{"gr":{"p":"hw-","s":10}}}, any other effect choice stops it
       if (!l.isNull() && l[F("gr")].is<JsonObject>()) {
         JsonObject gr = l[F("gr")];
-        strlcpy(gifRotPrefix, gr["p"] | "", sizeof(gifRotPrefix));
-        gifRotSec = gifRotPrefix[0] ? constrain((int)(gr["s"] | 10), 3, 600) : 0;
-        gifRotNext = millis() + gifRotSec * 1000UL;
-        gifRotSeg = gr["id"] | -1;
-      } else if (gifRotSec && !so.isNull() && so.containsKey("fx") && (gifRotSeg < 0 || (so["id"] | -1) == gifRotSeg || !so.containsKey("id"))) gifRotSec = 0;
+        const char* pre = gr["p"] | "";
+        const int sec = gr["s"] | 10, gid = gr["id"] | -1;
+        if (gid < 0 && sv.is<JsonArray>()) {   // "All panels (each its own)": every zone in the command rotates
+          for (JsonObject o : sv.as<JsonArray>()) if (o.containsKey("id")) setGifRot(o["id"] | 0, pre, sec);
+        } else setGifRot(gid, pre, sec);
+      } else if (!sv.isNull()) {
+        // another effect on a zone stops that zone's rotation (the others keep going)
+        auto stopFor = [&](JsonObject o) { if (!o.isNull() && o.containsKey("fx")) stopGifRot(o.containsKey("id") ? (int)(o["id"] | 0) : -1); };
+        if (sv.is<JsonArray>()) { for (JsonObject o : sv.as<JsonArray>()) stopFor(o); } else stopFor(sv.as<JsonObject>());
+      }
       if (l.isNull()) return;
       bool save = false;
 
