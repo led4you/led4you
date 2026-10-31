@@ -13,7 +13,7 @@
 #include "wled.h"
 #include <WiFiUdp.h>
 
-#define L4Y_FW_VERSION 87      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
+#define L4Y_FW_VERSION 88      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
 #define L4Y_HOUSE_PORT 21329   // UDP port for house scenes ("L4YS" packets)
 extern const int l4yFwVersion = L4Y_FW_VERSION;   // shown by Improv (installer, Wi-Fi setup) as "v.."
 
@@ -341,6 +341,7 @@ class Led4youExtras : public Usermod {
     // the same as when it was saved (a new LED setup makes its own zones) and no boot preset is set.
     bool     zonesRestored = false;    // start-up check done: saving is allowed from now on
     uint32_t zonesSig = 0, zonesSavedSig = 0, zonesChangedAt = 0, zonesCheckAt = 0;
+    unsigned zonesSavedCount = 0;      // zones in the saved layout
 
     static uint32_t zHash(uint32_t h, uint32_t v) { return (h ^ v) * 16777619u; }
     uint32_t busSig() const {
@@ -353,6 +354,11 @@ class Led4youExtras : public Usermod {
       return h;
     }
     static uint8_t zOpts(const Segment& g) { return (g.reverse ? 1 : 0) | (g.mirror ? 2 : 0) | (g.reverse_y ? 4 : 0) | (g.mirror_y ? 8 : 0); }
+    static unsigned zoneCount() {
+      unsigned n = 0;
+      for (size_t i = 0; i < strip.getSegmentsNum(); i++) if (strip.getSegment(i).stop > strip.getSegment(i).start) n++;
+      return n;
+    }
     uint32_t zoneSig() const {
       uint32_t h = busSig();
       for (size_t i = 0; i < strip.getSegmentsNum(); i++) {
@@ -422,12 +428,19 @@ class Led4youExtras : public Usermod {
         restoreZones();
         zonesRestored = true;
         zonesSavedSig = zonesSig = zoneSig();
+        zonesSavedCount = zoneCount();
         return;
       }
-      if (errorFlag == ERR_NORAM || errorFlag == ERR_NORAM_PX) return;   // memory trouble may have removed zones: keep the saved ones
       const uint32_t sg = zoneSig();
       if (sg != zonesSig) { zonesSig = sg; zonesChangedAt = now; return; }
-      if (sg != zonesSavedSig && now - zonesChangedAt > 5000) { saveZones(); zonesSavedSig = sg; }
+      if (sg != zonesSavedSig && now - zonesChangedAt > 5000) {
+        // short of memory, WLED can drop zones: then keep the saved layout. Only fewer zones can come from that, so new
+        // or changed zones are always saved (the error flag alone stays up for long, e.g. while a GIF waits for memory,
+        // and kept new zones from being saved: they were gone after a restart)
+        const unsigned n = zoneCount();
+        if ((errorFlag == ERR_NORAM || errorFlag == ERR_NORAM_PX) && n < zonesSavedCount) return;
+        saveZones(); zonesSavedSig = sg; zonesSavedCount = n;
+      }
     }
     // AI: end
 
