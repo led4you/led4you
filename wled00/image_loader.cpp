@@ -191,7 +191,7 @@ static void l4yFit(GifSlot& sl, Segment& seg) {
 // freed when no GIF is open, so it only takes memory while GIFs play
 static void l4yScratchTidy() {
   for (auto& s : slots) if (s.hasDec) return;
-  free(l4yGifScratch); l4yGifScratch = nullptr;
+  l4yGifScratchFree();
 }
 #endif
 
@@ -279,7 +279,16 @@ byte renderImageToSegment(Segment &seg) {
     sl.decoder.dealloc();
     sl.hasDec = false;
 #ifdef L4Y_GIF_SHARED_SCRATCH
-    const size_t scr = l4yGifScratch ? 0 : sizeof(L4YGIFSCRATCH);   // the shared working area, if not there yet
+    // the shared working area is sized for the biggest open GIF: read this GIF's canvas size from its header
+    // (bytes 6-9) and grow the area if it is too small (a 16x16 GIF needs ~7 KB, a 64x64 one ~21 KB)
+    int codes = 4096;
+    {
+      uint8_t hdr[10];
+      if (sl.file.read(hdr, 10) == 10 && hdr[0] == 'G' && hdr[1] == 'I' && hdr[2] == 'F') codes = l4yGifCodesFor(hdr[6] | (hdr[7] << 8), hdr[8] | (hdr[9] << 8));
+      sl.file.seek(0);
+    }
+    if (codes < 512) codes = 512;
+    const size_t scr = (l4yGifScratch && l4yGifScratch->n >= codes) ? 0 : l4yGifScratchBytes(codes);   // memory still needed for it
 #else
     const size_t scr = 0;
 #endif
@@ -287,7 +296,7 @@ byte renderImageToSegment(Segment &seg) {
     if (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < max(sizeof(AnimatedGIF), scr) + 512 ||
         heap_caps_get_free_size(MALLOC_CAP_8BIT) < sizeof(AnimatedGIF) + scr + 16384
 #ifdef L4Y_GIF_SHARED_SCRATCH
-        || (!l4yGifScratch && !(l4yGifScratch = (L4YGIFSCRATCH*)malloc(sizeof(L4YGIFSCRATCH))))
+        || !l4yGifScratchEnsure(codes)
 #endif
         ) {   // LED4YOU: 16 KB left over (the low-memory guard only acts under 10 KB)
 #else

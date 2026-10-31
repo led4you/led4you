@@ -25,3 +25,12 @@ palette and file position (~1 KB), so two or three GIFs (one per matrix) fit nex
 `wled00/image_loader.cpp` allocates the area before the first GIF and frees it when no GIF is open.
 
 Copy the three files over `AnimatedGIF/src/` in the library folder used by PlatformIO before building `led4you_esp32` and `led4you_c3`.
+
+**v86:** the shared area is sized for the open GIFs instead of the worst case. Each LZW code adds at most one table
+entry and outputs at least one pixel, so a frame needs at most (clear code + 2 + pixels of the canvas) entries, at
+most 4096: a 16x16 GIF needs 514 entries, about 6.8 KB instead of 23 KB (`l4yGifCodesFor`, `l4yGifScratchEnsure`;
+the player reads the canvas size from the GIF header). The file buffer / pixel stack is 2 KB. Damaged data can no
+longer read or write outside the tables (code and LZW-offset checks, colour bits kept in range, memmove for the
+overlapping copy). Tested on the PC with AddressSanitizer: the 55 pack GIFs and 4 stress GIFs (64x64 noise with
+12-bit codes, local palettes, transparency, 2 colours) decode exactly as with the original library, interleaved
+and with the area growing; 300 damaged GIFs cause no memory error (the original library: 13).

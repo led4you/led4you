@@ -344,7 +344,7 @@ static int GIFParseInfo(GIFIMAGE *pPage, int bInfoOnly)
                         c = p[iOffset++]; /* Block length */
                         if ((iBytesRead - iOffset) < (c+32)) // need to read more data first
                         {
-                            memcpy(GIFSCR(pPage, ucFileBuf), &GIFSCR(pPage, ucFileBuf)[iOffset], (iBytesRead-iOffset)); // move existing data down
+                            memmove(GIFSCR(pPage, ucFileBuf), &GIFSCR(pPage, ucFileBuf)[iOffset], (iBytesRead-iOffset)); // move existing data down
                             iBytesRead -= iOffset;
                             iStartPos += iOffset;
                             iOffset = 0;
@@ -386,7 +386,7 @@ static int GIFParseInfo(GIFIMAGE *pPage, int bInfoOnly)
                         c = p[iOffset++]; /* Block length */
                         if ((iBytesRead - iOffset) < (c+32)) // need to read more data first
                         {
-                            memcpy(GIFSCR(pPage, ucFileBuf), &GIFSCR(pPage, ucFileBuf)[iOffset], (iBytesRead-iOffset)); // move existing data down
+                            memmove(GIFSCR(pPage, ucFileBuf), &GIFSCR(pPage, ucFileBuf)[iOffset], (iBytesRead-iOffset)); // move existing data down
                             iBytesRead -= iOffset;
                             iStartPos += iOffset;
                             iOffset = 0;
@@ -467,6 +467,7 @@ static int GIFParseInfo(GIFIMAGE *pPage, int bInfoOnly)
     }
     pPage->ucCodeStart = p[iOffset++]; /* initial code size */
     /* Since GIF can be 1-8 bpp, we only allow 1,4,8 */
+    if (pPage->ucCodeStart < 2 || pPage->ucCodeStart > 8) pPage->ucCodeStart = 8; // LED4YOU: damaged data, keep inside the table
     pPage->iBpp = cGIFBits[pPage->ucCodeStart];
     // we are re-using the same buffer turning GIF file data
     // into "pure" LZW
@@ -525,7 +526,7 @@ int GIF_getInfo(GIFIMAGE *pPage, GIFINFO *pInfo)
     iDataRemaining = pPage->GIFFile.iSize;
     cBuf = (uint8_t *) GIFSCR(pPage, ucFileBuf);
     (*pPage->pfnSeek)(&pPage->GIFFile, 0);
-    iDataAvailable = (*pPage->pfnRead)(&pPage->GIFFile, cBuf, FILE_BUF_SIZE);
+    iDataAvailable = (*pPage->pfnRead)(&pPage->GIFFile, cBuf, GIF_FILEBUF);
     iDataRemaining -= iDataAvailable;
     lFileOff += iDataAvailable;
     iOff = 10;
@@ -546,7 +547,7 @@ int GIF_getInfo(GIFIMAGE *pPage, GIFINFO *pInfo)
                 memcpy(cBuf, &cBuf[iOff], (iDataAvailable-iOff)); // move existing data down
                 iDataAvailable -= iOff;
                 iOff = 0;
-                iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], FILE_BUF_SIZE-iDataAvailable);
+                iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], GIF_FILEBUF-iDataAvailable);
                 iDataAvailable += iReadAmount;
                 iDataRemaining -= iReadAmount;
                 lFileOff += iReadAmount;
@@ -589,7 +590,7 @@ int GIF_getInfo(GIFIMAGE *pPage, GIFINFO *pInfo)
                             memcpy(cBuf, &cBuf[iOff], (iDataAvailable-iOff)); // move existing data down
                             iDataAvailable -= iOff;
                             iOff = 0;
-                            iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], FILE_BUF_SIZE-iDataAvailable);
+                            iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], GIF_FILEBUF-iDataAvailable);
                             iDataAvailable += iReadAmount;
                             iDataRemaining -= iReadAmount;
                             lFileOff += iReadAmount;
@@ -634,7 +635,7 @@ int GIF_getInfo(GIFIMAGE *pPage, GIFINFO *pInfo)
                  iOff -= iDataAvailable;
                  iDataAvailable = 0;
              }
-             iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], FILE_BUF_SIZE-iDataAvailable);
+             iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], GIF_FILEBUF-iDataAvailable);
              iDataAvailable += iReadAmount;
              iDataRemaining -= iReadAmount;
              lFileOff += iReadAmount;
@@ -642,12 +643,12 @@ int GIF_getInfo(GIFIMAGE *pPage, GIFINFO *pInfo)
         c = cBuf[iOff++];
         while (c) /* While there are more data blocks */
         {
-            if (iOff > (3*FILE_BUF_SIZE/4) && iDataRemaining > 0) /* Near end of buffer, re-align */
+            if (iOff > (3*GIF_FILEBUF/4) && iDataRemaining > 0) /* Near end of buffer, re-align */
             {
                 memcpy(cBuf, &cBuf[iOff], (iDataAvailable-iOff)); // move existing data down
                 iDataAvailable -= iOff;
                 iOff = 0;
-                iReadAmount = (FILE_BUF_SIZE - iDataAvailable);
+                iReadAmount = (GIF_FILEBUF - iDataAvailable);
                 if (iReadAmount > iDataRemaining)
                     iReadAmount = iDataRemaining;
                 iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], iReadAmount);
@@ -672,12 +673,12 @@ int GIF_getInfo(GIFIMAGE *pPage, GIFINFO *pInfo)
         {
             iNumFrames++;
              // read new page data starting at this offset
-            if (pPage->GIFFile.iSize > FILE_BUF_SIZE && iDataRemaining > 0) // since we didn't read the whole file in one shot
+            if (pPage->GIFFile.iSize > GIF_FILEBUF && iDataRemaining > 0) // since we didn't read the whole file in one shot
             {
                 memcpy(cBuf, &cBuf[iOff], (iDataAvailable-iOff)); // move existing data down
                 iDataAvailable -= iOff;
                 iOff = 0;
-                iReadAmount = (FILE_BUF_SIZE - iDataAvailable);
+                iReadAmount = (GIF_FILEBUF - iDataAvailable);
                 if (iReadAmount > iDataRemaining)
                     iReadAmount = iDataRemaining;
                 iReadAmount = (*pPage->pfnRead)(&pPage->GIFFile, &cBuf[iDataAvailable], iReadAmount);
@@ -807,10 +808,10 @@ static void GIFMakePels(GIFIMAGE *pPage, unsigned int code)
     unsigned char ucNeedMore = 0;
     /* Copy this string of sequential pixels to output buffer */
     //   iPixCount = 0;
-    s = GIFSCR(pPage, ucFileBuf) + FILE_BUF_SIZE; /* Pixels will come out in reversed order */
+    s = GIFSCR(pPage, ucFileBuf) + GIF_FILEBUF; /* Pixels will come out in reversed order */
     buf = GIFSCR(pPage, ucLineBuf) + (pPage->iWidth - pPage->iXCount);
     giftabs = GIFSCR(pPage, usGIFTable);
-    gifpels = &GIFSCR(pPage, ucGIFPixels)[PIXEL_LAST];
+    gifpels = &GIFSCR(pPage, ucGIFPixels)[GIF_NCODES];
     while (code < LINK_UNUSED)
     {
         if (s == GIFSCR(pPage, ucFileBuf)) /* Houston, we have a problem */
@@ -820,7 +821,7 @@ static void GIFMakePels(GIFIMAGE *pPage, unsigned int code)
         *(--s) = gifpels[code];
         code = giftabs[code];
     }
-    iPixCount = (int)(intptr_t)(GIFSCR(pPage, ucFileBuf) + FILE_BUF_SIZE - s);
+    iPixCount = (int)(intptr_t)(GIFSCR(pPage, ucFileBuf) + GIF_FILEBUF - s);
     
     while (iPixCount && pPage->iYCount > 0)
     {
@@ -939,7 +940,7 @@ static int DecodeLZW(GIFIMAGE *pImage, int iOptions)
     // this part only needs to be initialized once
     for (i = 0; i < cc; i++)
     {
-        gifpels[PIXEL_FIRST + i] = gifpels[PIXEL_LAST + i] = (unsigned short) i;
+        gifpels[PIXEL_FIRST + i] = gifpels[GIF_NCODES + i] = (unsigned short) i;
         giftabs[i] = LINK_END;
     }
 init_codetable:
@@ -949,13 +950,14 @@ init_codetable:
     nextcode = cc + 2;
     nextlim = (unsigned short) ((1 << codesize));
     // This part of the table needs to be reset multiple times
-    memset(&giftabs[cc], LINK_UNUSED, (4096 - cc)*sizeof(short));
+    memset(&giftabs[cc], LINK_UNUSED, (GIF_NCODES - cc)*sizeof(short));
     ulBits = INTELLONG(&p[pImage->iLZWOff]); // start by reading 4 bytes of LZW data
     GET_CODE
     if (code == cc) // we just reset the dictionary, so get another code
     {
       GET_CODE
     }
+    if (code >= GIF_NCODES) return -1; // LED4YOU: damaged data
     oldcode = code;
     GIFMakePels(pImage, code); // first code is output as the first pixel
     // Main decode loop
@@ -964,16 +966,17 @@ init_codetable:
         GET_CODE
         if (code == cc) /* Clear code?, and not first code */
             goto init_codetable;
+        if (code >= GIF_NCODES || pImage->iLZWOff > LZW_BUF_SIZE - 8) return -1; // LED4YOU: damaged data, never read past the tables or the LZW data
         if (code != eoi)
         {
-                if (nextcode < nextlim) // for deferred cc case, don't let it overwrite the last entry (fff)
+                if (nextcode < nextlim && nextcode < GIF_NCODES) // for deferred cc case, don't let it overwrite the last entry (fff); LED4YOU: nor past the tables
                 {
                     giftabs[nextcode] = oldcode;
                     gifpels[PIXEL_FIRST + nextcode] = gifpels[PIXEL_FIRST + oldcode];
                     if (giftabs[code] == LINK_UNUSED) /* Old code */
-                        gifpels[PIXEL_LAST + nextcode] = gifpels[PIXEL_FIRST + oldcode];
+                        gifpels[GIF_NCODES + nextcode] = gifpels[PIXEL_FIRST + oldcode];
                     else
-                        gifpels[PIXEL_LAST + nextcode] = gifpels[PIXEL_FIRST + code];
+                        gifpels[GIF_NCODES + nextcode] = gifpels[PIXEL_FIRST + code];
                 }
                 nextcode++;
                 if (nextcode >= nextlim && codesize < 12)

@@ -22,7 +22,42 @@
 
 // Here is all of the actual code...
 #ifdef L4Y_GIF_SHARED_SCRATCH
+#include <stdlib.h>
 L4YGIFSCRATCH *l4yGifScratch = nullptr;
+int l4yGifCodesFor(int iWidth, int iHeight)
+{
+    long n = 258L + (long)iWidth * (long)iHeight;   // clear code (8-bit colours: 256) + clear + end + one per pixel
+    return (int)(n > 4096 ? 4096 : n);
+}
+size_t l4yGifScratchBytes(int n)
+{
+    return sizeof(L4YGIFSCRATCH) + MAX_WIDTH + L4Y_GIF_FILEBUF + LZW_BUF_SIZE + 2 * (size_t)n   // byte buffers
+         + 384 * sizeof(unsigned short) + (size_t)n * sizeof(unsigned short) + 4;              // palette, table (+ alignment)
+}
+bool l4yGifScratchEnsure(int n)
+{
+    if (n < 512) n = 512;
+    if (l4yGifScratch && l4yGifScratch->n >= n) return true;
+    unsigned char *m = (unsigned char *)malloc(l4yGifScratchBytes(n));
+    if (!m) return false;                            // the old area (if any) stays: GIFs already open keep playing
+    L4YGIFSCRATCH *s = (L4YGIFSCRATCH *)m;
+    unsigned char *p = m + sizeof(L4YGIFSCRATCH);
+    s->n = (unsigned short)n;
+    s->pLocalPalette = (unsigned short *)p; p += 384 * sizeof(unsigned short);   // 2-byte items first: aligned
+    s->usGIFTable = (unsigned short *)p;    p += (size_t)n * sizeof(unsigned short);
+    s->ucLZW = p;       p += LZW_BUF_SIZE;     // the other buffers follow it: the 4-byte code reads near its end stay inside
+    s->ucLineBuf = p;   p += MAX_WIDTH;
+    s->ucFileBuf = p;   p += L4Y_GIF_FILEBUF;
+    s->ucGIFPixels = p;
+    free(l4yGifScratch);
+    l4yGifScratch = s;
+    return true;
+}
+void l4yGifScratchFree(void)
+{
+    free(l4yGifScratch);
+    l4yGifScratch = nullptr;
+}
 #endif
 #include "gif.inl"
 

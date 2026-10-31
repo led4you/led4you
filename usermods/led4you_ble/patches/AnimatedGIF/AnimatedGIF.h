@@ -165,18 +165,27 @@ typedef struct gif_image_tag
 // open GIF shares one working area (~23 KB) and keeps only its global palette and file position (~1 KB). The
 // caller allocates l4yGifScratch before opening or playing a GIF and frees it when no GIF is open.
 #ifdef L4Y_GIF_SHARED_SCRATCH
+// The LZW tables are sized for the GIFs that are open: each code adds at most one table entry and outputs at least
+// one pixel, so a frame never needs more than (clear code + 2 + pixels of the canvas) entries, at most 4096.
+// A 16x16 GIF needs 514 entries: ~6.7 KB in all instead of ~23 KB.
+#define L4Y_GIF_FILEBUF 2048   // header, palette and extension blocks, and the pixel stack of one LZW string
 typedef struct l4y_gif_scratch_tag {
-    unsigned char ucLineBuf[MAX_WIDTH];
-    unsigned char ucFileBuf[FILE_BUF_SIZE];
-    unsigned short pLocalPalette[384];
-    unsigned char ucLZW[LZW_BUF_SIZE];
-    unsigned short usGIFTable[4096];
-    unsigned char ucGIFPixels[8192];
+    unsigned short n;                     // LZW table entries this area holds (codes 0..n-1)
+    unsigned char *ucLineBuf, *ucFileBuf, *ucLZW, *ucGIFPixels;
+    unsigned short *pLocalPalette, *usGIFTable;
 } L4YGIFSCRATCH;
 extern L4YGIFSCRATCH *l4yGifScratch;
+int l4yGifCodesFor(int iWidth, int iHeight);               // table entries a GIF of this canvas size needs
+size_t l4yGifScratchBytes(int n);                          // memory for a working area with n entries
+bool l4yGifScratchEnsure(int n);                           // make the shared area hold at least n entries (keeps the old one if this fails)
+void l4yGifScratchFree(void);
 #define GIFSCR(p, f) (l4yGifScratch->f)
+#define GIF_NCODES (l4yGifScratch->n)
+#define GIF_FILEBUF L4Y_GIF_FILEBUF
 #else
 #define GIFSCR(p, f) ((p)->f)
+#define GIF_NCODES 4096
+#define GIF_FILEBUF FILE_BUF_SIZE
 #endif
 
 #ifdef __cplusplus
