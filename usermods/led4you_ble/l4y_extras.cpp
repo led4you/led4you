@@ -13,7 +13,7 @@
 #include "wled.h"
 #include <WiFiUdp.h>
 
-#define L4Y_FW_VERSION 99      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
+#define L4Y_FW_VERSION 100     // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
 #define L4Y_HOUSE_PORT 21329   // UDP port for house scenes ("L4YS" packets)
 extern const int l4yFwVersion = L4Y_FW_VERSION;   // shown by Improv (installer, Wi-Fi setup) as "v.."
 
@@ -446,8 +446,12 @@ class Led4youExtras : public Usermod {
       releaseJSONBufferLock();
       return true;
     }
+    // v100: a firmware update clears all zones first (WLED frees memory for it); the update takes longer than the
+    // 5 s wait, so the single zone left was saved over the real zones and they were gone after the update
+    bool zonesFrozen = false;
     void runZoneMemory() {
       const uint32_t now = millis();
+      if (zonesFrozen) return;
       if ((int32_t)(now - zonesCheckAt) < 0) return;
       zonesCheckAt = now + 2000;
       if (!zonesRestored) {
@@ -473,6 +477,10 @@ class Led4youExtras : public Usermod {
     // AI: end
 
   public:
+    void onUpdateBegin(bool init) override {
+      zonesFrozen = init;
+      if (!init) { zonesRestored = false; zonesCheckAt = millis() + 2000; }   // update failed: put the zones back
+    }
     void setup() override {
       l4yExtras = this;
       l4yFxIds[0] = strip.addEffect(255, &mode_candycane, _data_FX_L4Y_CANDYCANE);
