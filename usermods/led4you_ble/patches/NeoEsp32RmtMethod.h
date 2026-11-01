@@ -146,6 +146,11 @@ struct L4yQuadHub {
 inline L4yQuadHub& l4yHub() { static L4yQuadHub h; return h; }
 #endif
 
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(LED4YOU_BLE)
+// LED4YOU (patch, v101): RMT outputs that exist on the classic ESP32 (all are made before the first one starts)
+inline int& l4yRmtObjs() { static int n = 0; return n; }
+#endif
+
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 0)
 #define NEOPIXELBUS_RMT_INT_FLAGS (ESP_INTR_FLAG_LOWMED)
 #else
@@ -678,6 +683,9 @@ public:
 
     ~NeoEsp32RmtMethodBase()
     {
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(LED4YOU_BLE)
+        l4yRmtObjs()--;
+#endif
 #ifdef L4Y_SPI_LEDS
         if (_cand) l4yHub().alive--;
         if (_hubLane >= 0)
@@ -776,12 +784,21 @@ public:
             rmt_set_mem_block_num(RMT_CHANNEL_0, 1);
         }
 #endif
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(LED4YOU_BLE)
+        // LED4YOU (patch, v101): up to 4 RMT outputs each get 2 memory blocks (channels 0, 2, 4, 6), so the refill
+        // interrupt comes half as often and Bluetooth/Wi-Fi no longer delay it into wrong colours on outputs 2-4
+        // (the same fix as on the C3). More outputs: 1 block each, as before.
+        const bool l4yTwo = l4yRmtObjs() <= 4 && _rmtCh < RMT_CHANNEL_4;
+        if (l4yTwo) _rmtCh = static_cast<rmt_channel_t>(_channel.RmtChannelNumber * 2);
+#endif
         config.channel = _rmtCh;
         config.gpio_num = static_cast<gpio_num_t>(_pin);
 #if defined(CONFIG_IDF_TARGET_ESP32C3) && defined(LED4YOU_BLE)
         // LED4YOU (patch): one output on the C3 uses both RMT memory blocks, so the refill interrupt comes half as
         // often and Bluetooth/Wi-Fi interrupts no longer starve it (wrong colours on some LEDs)
         config.mem_block_num = (_rmtCh == RMT_CHANNEL_0) ? 2 : 1;   // a later 3rd output takes the 2nd block back (above)
+#elif defined(CONFIG_IDF_TARGET_ESP32) && defined(LED4YOU_BLE)
+        config.mem_block_num = l4yTwo ? 2 : 1;
 #else
         config.mem_block_num = 1;
 #endif
@@ -977,6 +994,9 @@ private:
 
     void construct()
     {
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(LED4YOU_BLE)
+        l4yRmtObjs()++;
+#endif
 #ifdef L4Y_SPI_LEDS
         _cand = T_SPEED::IdleLevel == RMT_IDLE_LEVEL_LOW;
         if (_cand) l4yHub().alive++;
