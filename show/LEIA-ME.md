@@ -1,4 +1,4 @@
-# Cubo das crianças (LED4YOU) — v6
+# Cubo das crianças (LED4YOU) — v7
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
