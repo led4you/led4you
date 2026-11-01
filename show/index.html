@@ -124,7 +124,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=13"></script>
+<script src="../studio.js?v=14"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -243,7 +243,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		const lab = fx.startsWith('n:') ? f.name : ([].concat(FXS.hw, FXS.xm, FXS.ev).find(x => x[0] === fx.slice(2)) || [])[1] || f.name;
 		$('fxPvName').textContent = lab + (fxPal ? ' · ' + PALN[fxPal] : '');
 		const sz = cfg.faces[Math.max(0, face)] || cfg.faces[0] || { w: 16, h: 16 };
-		pvCv.update({ name: f.name, d2: f.d2, col: [rgb(fxC1), rgb(fxC2), [0, 0, 0]], pal: fxPal >= 2 ? palStops(fxPal) : null, speed: 128, mw: sz.w, mh: sz.h });
+		const tint = fxPal === 1 ? [0, 255, 40, 70, 64, 255, 190, 40, 128, 50, 210, 100, 192, 40, 150, 255, 255, 255, 40, 70] : fxPal >= 2 ? palStops(fxPal) : null;
+		pvCv.update({ name: f.name, d2: f.d2, col: [rgb(fxC1), rgb(fxC2), [0, 0, 0]], pal: tint, tint, speed: 128, mw: sz.w, mh: sz.h });
 	};
 	const drawPals = () => {
 		$('pals').replaceChildren(...PALN.map((n, i) => {
