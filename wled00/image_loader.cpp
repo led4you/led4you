@@ -15,7 +15,9 @@
 // Each playing GIF needs about 22 KB of RAM for its decoder: the ESP32-C3 keeps one slot (its RAM is too small with
 // Bluetooth and Wi-Fi), other ESP32 boards get three (each one is still only opened when enough RAM is free).
 #ifndef L4Y_GIF_SLOTS
-  #if defined(LED4YOU_BLE) && !defined(CONFIG_IDF_TARGET_ESP32C3)
+  #if defined(LED4YOU_BLE) && !defined(CONFIG_IDF_TARGET_ESP32C3) && defined(L4Y_GIF_SHARED_SCRATCH)
+    #define L4Y_GIF_SLOTS 4                        // a 4-sided cube: one GIF per side (each more GIF needs ~1-2 KB)
+  #elif defined(LED4YOU_BLE) && !defined(CONFIG_IDF_TARGET_ESP32C3)
     #define L4Y_GIF_SLOTS 3
   #elif defined(LED4YOU_BLE) && defined(L4Y_GIF_SHARED_SCRATCH)
     #define L4Y_GIF_SLOTS 2                        // C3 with the shared decoder working area: each more GIF needs ~1 KB
