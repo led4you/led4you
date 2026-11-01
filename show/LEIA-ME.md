@@ -1,4 +1,4 @@
-# Cubo das crianças (LED4YOU) — v5
+# Cubo das crianças (LED4YOU) — v6
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
@@ -74,7 +74,10 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
 ## Como funciona
 
 - **Mensagem**: escrita pela criança (até 40 letras, sem acentos nas luzes) ou uma das prontas do tema.
-- **Imagem**: GIF do LED4YOU GIF pack. Na primeira vez, a ponte vai buscá-lo ao site e envia-o para a placa.
+- **Imagem**: GIF do LED4YOU GIF pack. A ponte confirma que o GIF está na placa e, se não estiver (por exemplo depois
+  de "Apagar todos os GIF" na app), vai buscá-lo ao site e envia-o outra vez.
+- **Imagem em todos os lados**: o ESP32 (firmware v90 ou mais nova) mostra até 4 GIF ao mesmo tempo, um por lado;
+  a C3 só 2.
 - **Desenho**: 9 cores, com o tamanho do lado escolhido.
 - Quando não há mais pedidos, o cubo volta ao que mostrava antes.
 
@@ -82,8 +85,10 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
 
 - **Palavrões**: o texto livre passa por um filtro (português e inglês, também com números). Nenhum filtro é
   perfeito: se aparecer algo que não quer, ligue a aprovação ou desligue o texto livre.
-- **Um pedido por minuto** em cada telemóvel; no máximo 20 pedidos em fila ou por aprovar.
+- **Um pedido por minuto** em cada telemóvel e, na ponte, **no máximo 6 pedidos por minuto** no total (pedidos
+  repetidos são ignorados); no máximo 20 pedidos em fila ou por aprovar.
 - O canal do ntfy.sh é público: quem souber o código pode enviar pedidos. A ponte só aceita pedidos válidos
   (mensagens prontas, imagens do pack, desenhos do tamanho certo). Para mudar o código, mude `topic` em
   `show_config.json` e reimprima o QR.
-- A página de controlo não tem palavra-passe: só é acessível na rede de casa.
+- A página de controlo não tem palavra-passe: só é acessível na rede de casa, e só aceita ordens dela própria
+  (um site qualquer aberto num telemóvel da rede de casa não consegue mudar as definições).

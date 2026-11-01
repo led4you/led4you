@@ -221,7 +221,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 		const last = txt.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
 		let st = null; try { st = last && JSON.parse(last.message); } catch (e) {}
 		closed = !st || !st.on || Date.now() / 1000 - (st.at || 0) > 7200;   // no news for 2 hours: the bridge is off
-		if (st && Array.isArray(st.faces) && st.faces.length) cfg.faces = st.faces.slice(0, 8).map(f => ({ n: String(f.n || '').slice(0, 20), w: Math.max(4, Math.min(64, f.w | 0)), h: Math.max(4, Math.min(64, f.h | 0)) }));
+		if (st && Array.isArray(st.faces) && st.faces.length) cfg.faces = st.faces.slice(0, 8).map(f => ({ n: String(f.n || '').slice(0, 20), w: Math.max(1, Math.min(128, f.w | 0)), h: Math.max(1, Math.min(128, f.h | 0)) }));
 		if (st) { cfg.theme = URL_THEME || (['hw', 'xm', 'ev', ''].includes(st.theme) ? st.theme : ''); cfg.free = !!st.free; }
 		if (face >= cfg.faces.length) face = -1;
 		apply();

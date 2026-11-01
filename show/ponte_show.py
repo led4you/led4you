@@ -13,7 +13,7 @@
 # Só usa a biblioteca normal do Python 3 (nada para instalar). Arranque:  python3 ponte_show.py
 # As escolhas ficam em show_config.json, ao lado deste ficheiro.
 
-import json, os, sys, time, threading, queue, unicodedata, re, socket, secrets, urllib.request, uuid
+import json, os, sys, time, threading, queue, unicodedata, re, socket, secrets, urllib.request, uuid, collections
 from concurrent.futures import ThreadPoolExecutor
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -23,6 +23,8 @@ PAGE = "https://coristinaa.github.io/led4you/show/"
 GIF_SITE = "https://coristinaa.github.io/led4you/gifs/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "show_config.json")
 QUEUE_MAX = 20
+RATE_MAX = 6          # no máximo 6 pedidos aceites por minuto, venham de onde vierem (o limite da página é só no telemóvel)
+FACE_MAX = 128        # tamanho máximo de um lado (igual na página dos visitantes)
 
 PAL = ["000000", "ffffff", "ff2a2a", "ff7a1a", "ffd23f", "39d353", "2bb7ff", "9b5cff", "ff4fd8"]   # igual à página
 BAD = ["merda", "caralho", "foda", "fodase", "puta", "cabrao", "cona", "piroca", "pila", "paneleiro", "filhodaputa",
@@ -48,7 +50,8 @@ jobs = queue.Queue(QUEUE_MAX)
 pending = []          # pedidos à espera de aprovação: {id, kind, cmd, raw, at}
 boards = []           # placas encontradas na rede: {ip, name, w, h}
 logs = []
-uploaded = set()
+uploaded = {}        # (ip, nome do GIF) -> hora em que se confirmou que está na placa
+recent = collections.deque()   # (hora, pedido) dos pedidos aceites no último minuto
 now_showing = {"what": ""}
 
 
@@ -100,8 +103,21 @@ def http_json(ip, path, body=None, timeout=5):
         return json.loads(r.read() or b"null")
 
 
+def gif_on_board(ip, name):
+    """o GIF ainda está na placa? (pode ter sido apagado na app, por exemplo com "Apagar todos os GIF")"""
+    try:
+        with urllib.request.urlopen("http://%s/%s" % (ip, name), timeout=4) as r:
+            return r.status == 200 and r.read(6)[:3] == b"GIF"
+    except Exception:
+        return False
+
+
 def upload_gif(ip, name):
-    if (ip, name) in uploaded:
+    # confirmado há menos de 10 minutos: não perguntar outra vez; senão ver se ainda lá está antes de o enviar de novo
+    if time.time() - uploaded.get((ip, name), 0) < 600:
+        return True
+    if gif_on_board(ip, name):
+        uploaded[(ip, name)] = time.time()
         return True
     try:
         with urllib.request.urlopen(GIF_SITE + name, timeout=10) as r:
@@ -112,14 +128,14 @@ def upload_gif(ip, name):
         req = urllib.request.Request("http://%s/upload" % ip, data=body, headers={"Content-Type": "multipart/form-data; boundary=" + b})
         with urllib.request.urlopen(req, timeout=15) as r:
             r.read()
-        uploaded.add((ip, name))
+        uploaded[(ip, name)] = time.time()
         return True
     except Exception as e:
         log("imagem", name, "não foi para a placa:", e)
         return False
 
 
-def check(msg):
+def check(msg, allow_free=False):
     """valida um pedido vindo da internet; devolve (tipo, comando, resumo) ou None"""
     try:
         m = json.loads(msg)
@@ -139,7 +155,7 @@ def check(msg):
             if not any(t in v for v in QUICK.values()):
                 return None
         else:
-            if not S["free"]:
+            if not (S["free"] or allow_free):
                 return None
             t = str(m.get("t", ""))[:40].strip()
             if not t or is_bad(t):
@@ -178,6 +194,17 @@ def add(msg):
     if not job:
         log("pedido recusado:", msg[:80])
         return
+    now = time.time()
+    with lock:
+        while recent and now - recent[0][0] > 60:
+            recent.popleft()
+        if any(m == msg for _, m in recent):
+            log("pedido repetido ignorado")
+            return
+        if len(recent) >= RATE_MAX:
+            log("demasiados pedidos neste minuto, ignorado")
+            return
+        recent.append((now, msg))
     kind, cmd, info = job
     if S["approve"]:
         with lock:
@@ -376,7 +403,7 @@ pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:2
 <div class="card"><div class="ct">Registo</div><div class="note" id="now"></div><pre id="log"></pre></div>
 </main><script>
 const $=id=>document.getElementById(id);let st=null,editing=false,qrFor='',zonesFor=null;
-const api=(p,b)=>fetch('/api/'+p,b===undefined?{}:{method:'POST',body:JSON.stringify(b)}).then(r=>r.json());
+const api=(p,b)=>fetch('/api/'+p,b===undefined?{}:{method:'POST',headers:{'X-L4Y':'1'},body:JSON.stringify(b)}).then(r=>r.json());
 function opt(sel,list,val){sel.replaceChildren(...list.map(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;return o;}));sel.value=val;}
 let zl=[];
 async function loadZones(ip,faces){zl=[];if(ip){try{zl=await api('zones?ip='+encodeURIComponent(ip));}catch(e){}}
@@ -454,6 +481,10 @@ class Admin(BaseHTTPRequestHandler):
         self.send(404, {"error": "?"})
 
     def do_POST(self):
+        # só a página de controlo envia este cabeçalho: um site qualquer aberto num telemóvel da rede de casa não o
+        # consegue juntar (o navegador pediria autorização, que a ponte nunca dá), por isso não consegue mudar nada
+        if self.headers.get("X-L4Y") != "1":
+            return self.send(403, {"error": "forbidden"})
         p, b = self.path, self.body()
         if p == "/api/settings":
             changed_on = "on" in b and bool(b["on"]) != S["on"]
@@ -466,7 +497,7 @@ class Admin(BaseHTTPRequestHandler):
                 if isinstance(b.get("faces"), list):
                     fs = []
                     for f in b["faces"][:8]:
-                        if isinstance(f, dict) and all(isinstance(f.get(k), int) and 0 <= f[k] <= 128 for k in ("zone", "w", "h")):
+                        if isinstance(f, dict) and isinstance(f.get("zone"), int) and 0 <= f["zone"] < 32 and all(isinstance(f.get(k), int) and 1 <= f[k] <= FACE_MAX for k in ("w", "h")):
                             fs.append({"zone": f["zone"], "w": f["w"], "h": f["h"], "n": str(f.get("n", ""))[:20]})
                     S["faces"] = fs
                 if b.get("theme") in ("hw", "xm", "ev", ""):
@@ -496,9 +527,7 @@ class Admin(BaseHTTPRequestHandler):
                 enqueue(item["kind"], item["cmd"], item["info"])
             return self.send(200, {"ok": bool(item)})
         if p == "/api/test":
-            was, S["free"] = S["free"], True   # o teste pode ter texto escrito
-            job = check(json.dumps({"k": "text", "t": str(b.get("t", "Ola!"))[:40], "c": 3, "z": -1}))
-            S["free"] = was
+            job = check(json.dumps({"k": "text", "t": str(b.get("t", "Ola!"))[:40], "c": 3, "z": -1}), allow_free=True)   # o teste pode ter texto escrito
             if job and S["board"]:
                 enqueue(*job)
             return self.send(200, {"ok": bool(job)})
