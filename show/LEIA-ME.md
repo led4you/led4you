@@ -1,8 +1,9 @@
-# Cubo das crianças (LED4YOU) — v9
+# Cubo das crianças (LED4YOU) — v10
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
-O pedido aparece no cubo de matrizes, um de cada vez, por ordem de chegada.
+O pedido aparece logo no lado escolhido. Cada lado é independente: enquanto um lado mostra um texto, os outros
+recebem outros pedidos. Pedidos para o mesmo lado esperam pela vez, por ordem de chegada.
 
 O cubo é **à parte do show**: não entra nas sequências do xLights nem no FPP. A ponte fala diretamente com a placa
 LED4YOU / WLED do cubo.
@@ -90,7 +91,7 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
 - **Efeito** (v8): 6 efeitos por tema (Halloween: casa assombrada, olhos, fogo, relâmpagos…; Natal: neve, bengala
   doce, árvore, estrelas, fogo de artifício…). O número de cada efeito é pedido à própria placa.
 - **Desenho**: 9 cores, com o tamanho do lado escolhido.
-- Quando não há mais pedidos, o cubo volta ao que mostrava antes.
+- Quando um lado acaba e não tem mais pedidos, volta ao que mostrava antes.
 
 ## Cuidados
 

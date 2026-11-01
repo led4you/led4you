@@ -255,46 +255,85 @@ def enqueue(kind, cmd, info):
         log("fila cheia, pedido ignorado")
 
 
+waiting = []          # pedidos já tirados da fila, à espera que o lado (ou lados) deles fique livre
+
+
 def show_loop():
-    saved = None
+    """v10: cada lado é independente: um pedido para um lado aparece logo, mesmo que outro lado esteja a mostrar
+    um texto ou um efeito (antes era um pedido de cada vez para o cubo todo, e um texto longo num lado parava os outros).
+    Pedidos para o mesmo lado esperam pela vez, por ordem de chegada."""
+    saved = None          # (placa, estado da placa antes dos pedidos): cada lado volta ao que estava
+    busy = {}             # zona -> até quando está a mostrar um pedido
+    shown = {}            # zona -> o que está a mostrar (para a página de controlo)
     while True:
         try:
-            kind, cmd, info = jobs.get(timeout=1)
+            while True:
+                waiting.append(jobs.get_nowait())
         except queue.Empty:
-            if saved is not None and not S["hold"]:
-                ip, st = saved
-                try:
-                    for s in st.get("seg", []):
-                        s["frz"] = False
-                    http_json(ip, "/json/state", st)
-                    log("a matriz voltou ao que estava")
-                except Exception as e:
-                    log("não voltei ao estado anterior:", e)
-                saved = None
-                now_showing["what"] = ""
-            continue
+            pass
+        now = time.time()
         ip = S["board"]
         if not S["on"] or not ip:
+            waiting.clear(); busy.clear(); shown.clear(); saved = None; now_showing["what"] = ""
+            time.sleep(0.5)
             continue
-        try:
-            if saved is None:
-                saved = (ip, http_json(ip, "/json/state"))
-            if kind == "gif" and not upload_gif(ip, cmd["seg"][0]["n"]):
+        # o primeiro pedido da fila para cada lado livre (um pedido para todos os lados espera que todos fiquem livres)
+        started = False
+        taken = set()
+        for job in list(waiting):
+            kind, cmd, info = job
+            zones = [sg["id"] for sg in cmd["seg"]]
+            if any(busy.get(z, 0) > now or z in taken for z in zones):
+                taken.update(zones)       # quem chegou primeiro a estes lados tem a vez
                 continue
-            if kind == "fx":   # o número do efeito é o desta placa (os efeitos do LED4YOU podem ter outro número noutra)
-                fid = fx_id(ip, info["n"])
-                if fid < 0:
-                    log("esta placa não tem o efeito", info["n"])
+            waiting.remove(job)
+            taken.update(zones)
+            try:
+                if saved is None or saved[0] != ip:
+                    saved = (ip, http_json(ip, "/json/state"))
+                if kind == "gif" and not upload_gif(ip, cmd["seg"][0]["n"]):
                     continue
-                for sg in cmd["seg"]:
-                    sg["fx"] = fid
-            http_json(ip, "/json/state", cmd)
-            now_showing["what"] = kind + ": " + (info.get("t") or info.get("f") or info.get("n") or "desenho") + " (" + info.get("where", "") + ")"
-            log("a mostrar", now_showing["what"])
-            time.sleep(max(3, int(S["seconds"].get(kind, 15))))
-        except Exception as e:
-            log("a placa não respondeu:", e)
-            time.sleep(3)
+                if kind == "fx":   # o número do efeito é o desta placa (os efeitos do LED4YOU podem ter outro número noutra)
+                    fid = fx_id(ip, info["n"])
+                    if fid < 0:
+                        log("esta placa não tem o efeito", info["n"])
+                        continue
+                    for sg in cmd["seg"]:
+                        sg["fx"] = fid
+                http_json(ip, "/json/state", cmd)
+                what = kind + ": " + (info.get("t") or info.get("f") or info.get("n") or "desenho") + " (" + info.get("where", "") + ")"
+                log("a mostrar", what)
+                until = time.time() + max(3, int(S["seconds"].get(kind, 15)))
+                for z in zones:
+                    busy[z] = until
+                    shown[z] = what
+                started = True
+            except Exception as e:
+                log("a placa não respondeu:", e)
+                waiting.insert(0, job)
+                time.sleep(3)
+                break
+        # lados cujo tempo acabou e sem mais pedidos: voltam ao que estavam (a não ser "deixar o último pedido")
+        now = time.time()
+        for z in [z for z, t in busy.items() if t <= now]:
+            if any(z in [sg["id"] for sg in c["seg"]] for _, c, _ in waiting):
+                continue
+            del busy[z]
+            shown.pop(z, None)
+            if S["hold"] or saved is None:
+                continue
+            try:
+                old = [dict(sg, frz=False) for sg in saved[1].get("seg", []) if sg.get("id") == z]
+                if old:
+                    http_json(saved[0], "/json/state", {"seg": old})
+                    log("o lado voltou ao que estava (zona %d)" % z)
+            except Exception as e:
+                log("não voltei ao estado anterior:", e)
+        if not busy and not waiting and not S["hold"]:
+            saved = None
+        now_showing["what"] = " · ".join(shown[z] for z in sorted(shown))
+        if not started:
+            time.sleep(0.3)
 
 
 # ------------------------------------------------------------------------------ canal na internet ----
@@ -510,7 +549,7 @@ class Admin(BaseHTTPRequestHandler):
             return self.send(200, ADMIN, "text/html")
         if p == "/api/state":
             with lock:
-                return self.send(200, dict(S, boards=boards, url=qr_url(), urls={"hw": qr_url("hw"), "xm": qr_url("xm")}, log=logs[-40:], now=now_showing["what"], queue=jobs.qsize(),
+                return self.send(200, dict(S, boards=boards, url=qr_url(), urls={"hw": qr_url("hw"), "xm": qr_url("xm")}, log=logs[-40:], now=now_showing["what"], queue=jobs.qsize() + len(waiting),
                                          pending=[{k: v for k, v in x.items() if k != "cmd"} for x in pending]))
         if p == "/api/zones":
             ip = self.path.split("ip=", 1)[-1] if "ip=" in self.path else ""
@@ -559,6 +598,7 @@ class Admin(BaseHTTPRequestHandler):
                     pending.clear()
                 while not jobs.empty():
                     jobs.get_nowait()
+                waiting.clear()
             threading.Thread(target=publish_status, daemon=True).start()
             return self.send(200, {"ok": True})
         if p == "/api/scan":
