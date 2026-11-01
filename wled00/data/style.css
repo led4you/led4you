@@ -238,3 +238,7 @@ input:focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 2px
 body { padding: 0 12px 24px; }
 .sec { padding: 14px; box-shadow: 0 6px 20px -12px rgba(0,0,0,.6); }
 #toprow { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; }
+/* the top row must still hide (e.g. on the update page while the update runs): the ID rule above beat .hide */
+#toprow.hide, .hide { display: none !important; }
+/* the "?" help button sits at the left of the top row; in the centred row it was drawn on top of "Back" */
+#toprow .helpB, .toprow .helpB { position: absolute; left: 8px; top: 0; width: auto; }
