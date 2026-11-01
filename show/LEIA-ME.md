@@ -77,7 +77,7 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
 - **Imagem**: GIF do LED4YOU GIF pack. A ponte confirma que o GIF está na placa e, se não estiver (por exemplo depois
   de "Apagar todos os GIF" na app), vai buscá-lo ao site e envia-o outra vez.
 - **Imagem em todos os lados**: o ESP32 (firmware v90 ou mais nova) mostra até 4 GIF ao mesmo tempo, um por lado;
-  a C3 só 2.
+  a C3 (firmware v99 ou mais nova) também até 4, mas só enquanto houver memória (com Bluetooth ligado, 2 ou 3).
 - **Desenho**: 9 cores, com o tamanho do lado escolhido.
 - Quando não há mais pedidos, o cubo volta ao que mostrava antes.
 
