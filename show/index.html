@@ -16,9 +16,9 @@ h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.15; }
 .kick { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
 .note { font-size: 15px; color: var(--muted); margin: 0; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 5px; }
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 5px; }
 .tabs.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.tabs button { min-height: 52px; border: 0; border-radius: 14px; background: none; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer; }
+.tabs button { min-height: 52px; border: 0; border-radius: 14px; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 15px; padding: 0 2px; cursor: pointer; }
 .tabs button[aria-selected="true"] { background: var(--raise); color: var(--fg); }
 .lab { font-size: 15px; color: var(--muted); font-weight: 600; }
 input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 19px; }
@@ -51,7 +51,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
     <div class="kick" id="kick">Light Show Biscoitos</div>
     <h1>Põe a tua mensagem nas luzes!</h1>
   </div>
-  <p class="note" id="intro">Escolhe uma mensagem, uma imagem ou faz um desenho. Aparece nas luzes daqui a pouco, um pedido de cada vez.</p>
+  <p class="note" id="intro">Escolhe uma mensagem, uma imagem, um efeito ou faz um desenho. Aparece nas luzes daqui a pouco, um pedido de cada vez.</p>
   <p class="msg err" id="noShow" hidden>Este endereço não está completo. Lê outra vez o código QR da parede.</p>
   <p class="msg err" id="closed" hidden>As luzes não estão a receber pedidos agora. Volta a tentar mais logo!</p>
 
@@ -63,6 +63,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
   <div class="tabs" role="tablist" id="tabs">
     <button type="button" role="tab" aria-selected="true" data-tab="text">Mensagem</button>
     <button type="button" role="tab" aria-selected="false" data-tab="gif">Imagem</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="fx">Efeito</button>
     <button type="button" role="tab" aria-selected="false" data-tab="draw">Desenhar</button>
   </div>
 
@@ -81,6 +82,11 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
   <section class="card" id="pGif" hidden>
     <div class="lab">Escolhe uma imagem</div>
     <div class="gifs" id="gifs"></div>
+  </section>
+
+  <section class="card" id="pFx" hidden>
+    <div class="lab">Escolhe um efeito</div>
+    <div class="chips" id="fxs"></div>
   </section>
 
   <section class="card" id="pDraw" hidden>
@@ -130,7 +136,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 
 	// ---- tabs ----
 	let tab = 'text';
-	const panes = { text: $('pText'), gif: $('pGif'), draw: $('pDraw') };
+	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw') };
 	$('tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
 		tab = b.dataset.tab;
 		$('tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
@@ -164,6 +170,24 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 	};
 	swatches($('txtCols'), [1, 2, 3, 4, 5, 6, 7, 8], txtCol, i => { txtCol = i; updPrev(); });
 	$('txt').oninput = () => { if ($('txt').value.trim()) { quick = null; $('quick').querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', 'false')); } updPrev(); };
+
+	// ---- effects (the same keys as FX_LIST in ponte_show.py) ----
+	const FXS = {
+		hw: [['haunted', '👻 Casa assombrada'], ['eyes', '👀 Olhos no escuro'], ['fire', '🔥 Fogo'], ['lightning', '⚡ Relâmpagos'], ['firenoise', '🔥 Chamas mágicas'], ['blackhole', '🌀 Buraco negro']],
+		xm: [['snowfall', '❄️ Neve a cair'], ['candy', '🍬 Bengala doce'], ['retro', '🎄 Árvore de Natal'], ['twinkle', '✨ Estrelas a piscar'], ['fireworks', '🎆 Fogo de artifício'], ['bursts', '💥 Explosões de cor']],
+		ev: [['rainbow', '🌈 Arco-íris'], ['fireworks', '🎆 Fogo de artifício'], ['plasma', '🔮 Bola de plasma'], ['ripple', '💧 Ondas'], ['matrix', '💚 Chuva de letras'], ['pacifica', '🌊 Mar']]
+	};
+	let fx = null;
+	const drawFx = () => {
+		const seen = new Set();
+		const list = (FXS[cfg.theme] || [].concat(FXS.hw, FXS.xm, FXS.ev)).filter(([k]) => !seen.has(k) && seen.add(k));
+		if (!list.some(([k]) => k === fx)) fx = list[0][0];
+		$('fxs').replaceChildren(...list.map(([k, n]) => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = n; b.setAttribute('aria-pressed', String(k === fx));
+			b.onclick = () => { fx = k; drawFx(); };
+			return b;
+		}));
+	};
 
 	// ---- pictures (the LED4YOU GIF pack) ----
 	let gif = null, pack = [];
@@ -216,7 +240,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 	};
 
 	// ---- state of the lights (posted by the bridge on "<code>-estado") ----
-	const apply = () => { drawFaces(); drawQuick(); drawGifs(); buildGrid(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
+	const apply = () => { drawFaces(); drawQuick(); drawGifs(); drawFx(); buildGrid(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
 	const checkOpen = () => fetch(RELAY + TOPIC + '-estado/json?poll=1&since=all').then(r => r.text()).then(txt => {
 		const last = txt.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
 		let st = null; try { st = last && JSON.parse(last.message); } catch (e) {}
@@ -247,6 +271,9 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 		} else if (tab === 'gif') {
 			if (!gif) { say('Escolhe primeiro uma imagem.', 'err'); return; }
 			body = { k: 'gif', f: gif };
+		} else if (tab === 'fx') {
+			if (!fx) { say('Escolhe primeiro um efeito.', 'err'); return; }
+			body = { k: 'fx', e: fx };
 		} else {
 			if (!pixels.some(v => v)) { say('Faz primeiro um desenho.', 'err'); return; }
 			body = { k: 'draw', w: gw, h: gh, p: pixels.join('') };

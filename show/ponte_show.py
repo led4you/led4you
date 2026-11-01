@@ -35,7 +35,7 @@ GIF_OK = re.compile(r"^(hw|xm|ev)-[a-z0-9]{2,20}\.gif$")
 S = {   # definições (guardadas em show_config.json)
     "on": False, "topic": "l4yshow-3352b4beefd1", "board": "", "boardName": "",
     "faces": [],          # lados (zonas) onde aparecem os pedidos: [{"zone": id, "n": nome, "w": largura, "h": altura}]
-    "seconds": {"text": 20, "gif": 12, "draw": 15}, "theme": "hw", "approve": False,
+    "seconds": {"text": 20, "gif": 12, "draw": 15, "fx": 15}, "theme": "hw", "approve": False,
     "free": True,         # True = escrever texto livre (com filtro de palavrões); False = só as mensagens prontas
 }
 # mensagens prontas (iguais às da página dos visitantes)
@@ -45,6 +45,27 @@ QUICK = {
     "ev": ["Parabens!", "Viva!", "Ola!", "Feliz Ano Novo!", "Boa Pascoa!", "Amo-te!"],
     "": ["Ola!", "Viva!", "Boo!", "Feliz Natal!", "Feliz Halloween!", "Parabens!"],
 }
+# efeitos que os visitantes podem escolher (v8): chave -> nome do efeito na placa (iguais aos da página dos visitantes)
+FX_LIST = {
+    "hw": [("haunted", "Haunted"), ("eyes", "Halloween Eyes"), ("fire", "Fire 2012"), ("lightning", "Lightning"),
+           ("firenoise", "Firenoise"), ("blackhole", "Black Hole")],
+    "xm": [("snowfall", "Snowfall"), ("candy", "Candy Cane"), ("retro", "Retro Tree"), ("twinkle", "Twinklefox"),
+           ("fireworks", "Fireworks"), ("bursts", "Colored Bursts")],
+    "ev": [("rainbow", "Rainbow"), ("fireworks", "Fireworks"), ("plasma", "Plasma Ball"), ("ripple", "Ripple"),
+           ("matrix", "Matrix"), ("pacifica", "Pacifica")],
+}
+FX_NAMES = {k: n for v in FX_LIST.values() for k, n in v}
+fx_cache = {}         # placa -> (hora, lista dos nomes dos efeitos): o número de cada efeito vem da própria placa
+
+
+def fx_id(ip, name):
+    t, names = fx_cache.get(ip, (0, None))
+    if not names or time.time() - t > 600:
+        names = http_json(ip, "/json/eff")
+        fx_cache[ip] = (time.time(), names)
+    return names.index(name) if isinstance(names, list) and name in names else -1
+
+
 lock = threading.RLock()
 jobs = queue.Queue(QUEUE_MAX)
 pending = []          # pedidos à espera de aprovação: {id, kind, cmd, raw, at}
@@ -173,6 +194,11 @@ def check(msg, allow_free=False):
         if not GIF_OK.match(f):
             return None
         return "gif", segs({"fx": FX_IMAGE, "n": f, "sx": 128, "ix": 0, "c3": 0, "frz": False}), {"f": f, "where": where}
+    if k == "fx":
+        e = str(m.get("e", ""))
+        if e not in FX_NAMES:
+            return None
+        return "fx", segs({"fx": 0, "fxdef": True, "frz": False}), {"e": e, "n": FX_NAMES[e], "where": where}
     if k == "draw":
         p = str(m.get("p", ""))
         w, h = m.get("w"), m.get("h")
@@ -251,8 +277,15 @@ def show_loop():
                 saved = (ip, http_json(ip, "/json/state"))
             if kind == "gif" and not upload_gif(ip, cmd["seg"][0]["n"]):
                 continue
+            if kind == "fx":   # o número do efeito é o desta placa (os efeitos do LED4YOU podem ter outro número noutra)
+                fid = fx_id(ip, info["n"])
+                if fid < 0:
+                    log("esta placa não tem o efeito", info["n"])
+                    continue
+                for sg in cmd["seg"]:
+                    sg["fx"] = fid
             http_json(ip, "/json/state", cmd)
-            now_showing["what"] = kind + ": " + (info.get("t") or info.get("f") or "desenho") + " (" + info.get("where", "") + ")"
+            now_showing["what"] = kind + ": " + (info.get("t") or info.get("f") or info.get("n") or "desenho") + " (" + info.get("where", "") + ")"
             log("a mostrar", now_showing["what"])
             time.sleep(max(3, int(S["seconds"].get(kind, 15))))
         except Exception as e:
@@ -354,7 +387,7 @@ h1{margin:0;font-size:24px}.card{background:var(--card);border:1px solid var(--l
 select,input[type=number],input[type=text]{width:100%;min-height:44px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit}
 .btn{min-height:44px;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit;font-weight:600;cursor:pointer}
 .btn.primary{background:var(--hot);border-color:var(--hot);color:#120b1f}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.big{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:700}
+.three{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.big{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:700}
 .big input{width:26px;height:26px}.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:700}
 .on{background:var(--ok);color:#06240f}.off{background:#5a4d6b}.url{word-break:break-all;font-size:14px;background:#000;padding:10px;border-radius:10px}
 .qr{background:#fff;padding:10px;border-radius:12px;align-self:center}.qrs{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}.qrb{display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;max-width:240px}.item{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px}
@@ -382,6 +415,7 @@ pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:2
     <div><label for="sText">Texto (s)</label><input type="number" id="sText" min="3" max="120"></div>
     <div><label for="sGif">Imagem (s)</label><input type="number" id="sGif" min="3" max="120"></div>
     <div><label for="sDraw">Desenho (s)</label><input type="number" id="sDraw" min="3" max="120"></div>
+    <div><label for="sFx">Efeito (s)</label><input type="number" id="sFx" min="3" max="120"></div>
   </div>
   <label class="big" style="font-size:16px"><input type="checkbox" id="free"> Deixar escrever texto livre</label>
   <div class="note">Desligado (recomendado para crianças): só as mensagens prontas, as imagens e os desenhos.</div>
@@ -416,13 +450,13 @@ function render(){
  if(!editing){opt($('board'),[['','Escolha uma placa']].concat(st.boards.map(b=>[b.ip,b.name+' ('+b.ip+')'])).concat(st.board&&!st.boards.some(b=>b.ip===st.board)?[[st.board,(st.boardName||st.board)+' ('+st.board+')']]:[]),st.board);
   if(zonesFor!==st.board){zonesFor=st.board;loadZones(st.board,st.faces);}
   $('free').checked=st.free;
-  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('approve').checked=st.approve;}
+  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||15;$('approve').checked=st.approve;}
  const qk=st.urls.hw+st.urls.xm;$('url_hw').textContent=st.urls.hw;$('url_xm').textContent=st.urls.xm;
  if(qrFor!==qk&&window.QRCode){for(const t of ['hw','xm']){$('qr_'+t).replaceChildren();new QRCode($('qr_'+t),{text:st.urls[t],width:200,height:200,correctLevel:QRCode.CorrectLevel.M});}qrFor=qk;}
  $('pendCard').hidden=!st.pending.length;
  $('pend').replaceChildren(...st.pending.map(p=>{const d=document.createElement('div');d.className='item';const w=document.createElement('div');w.className='what';
   if(p.kind==='draw'){const c=document.createElement('canvas');c.width=p.info.w;c.height=p.info.h;c.style.width=(p.info.w*5)+'px';const g=c.getContext('2d');[...p.info.p].forEach((v,i)=>{if(v!=='0'){g.fillStyle='#'+['000000','ffffff','ff2a2a','ff7a1a','ffd23f','39d353','2bb7ff','9b5cff','ff4fd8'][+v];g.fillRect(i%p.info.w,Math.floor(i/p.info.w),1,1);}});w.append(c);}
-  else w.textContent=(p.kind==='text'?'Texto: '+p.info.t:'Imagem: '+p.info.f);if(p.info.where){const s=document.createElement('div');s.className='note';s.textContent=p.info.where;w.append(s);}
+  else w.textContent=(p.kind==='text'?'Texto: '+p.info.t:p.kind==='fx'?'Efeito: '+p.info.n:'Imagem: '+p.info.f);if(p.info.where){const s=document.createElement('div');s.className='note';s.textContent=p.info.where;w.append(s);}
   const ok=document.createElement('button');ok.className='btn primary';ok.textContent='Mostrar';ok.onclick=()=>api('approve',{id:p.id}).then(refresh);
   const no=document.createElement('button');no.className='btn';no.textContent='Recusar';no.onclick=()=>api('reject',{id:p.id}).then(refresh);
   d.append(w,ok,no);return d;}));
@@ -434,7 +468,7 @@ $('board').onchange=()=>{editing=true;loadZones($('board').value,[]);};$('free')
 $('scan').onclick=async()=>{$('scanMsg').textContent='A procurar… (até 10 s)';const r=await api('scan',{});$('scanMsg').textContent=r.length+' placa(s) encontrada(s)';editing=false;await refresh();};
 $('save').onclick=async()=>{const b=st.boards.find(x=>x.ip===$('board').value);const faces=facesNow();
  if(!faces.length){$('saveMsg').textContent='Marque pelo menos um lado.';return;}
- await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value}});
+ await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value}});
  editing=false;$('saveMsg').textContent='Guardado.';setTimeout(()=>$('saveMsg').textContent='',2500);refresh();};
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(st.urls[b.dataset.copy]).then(()=>{b.textContent='Copiado';setTimeout(()=>b.textContent='Copiar endereço',2000);}));
 $('test').onclick=()=>api('test',{t:$('testTxt').value||'Ola!'}).then(refresh);
@@ -503,7 +537,7 @@ class Admin(BaseHTTPRequestHandler):
                 if b.get("theme") in ("hw", "xm", "ev", ""):
                     S["theme"] = b["theme"]
                 if isinstance(b.get("seconds"), dict):
-                    for k in ("text", "gif", "draw"):
+                    for k in ("text", "gif", "draw", "fx"):
                         v = b["seconds"].get(k)
                         if isinstance(v, int) and 3 <= v <= 120:
                             S["seconds"][k] = v

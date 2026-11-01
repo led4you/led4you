@@ -1,4 +1,4 @@
-# Cubo das crianças (LED4YOU) — v7
+# Cubo das crianças (LED4YOU) — v8
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
@@ -60,7 +60,7 @@ Cada zona é uma matriz com o seu tamanho.
 - **Lados do cubo**: marque as zonas que são lados e dê-lhes um nome. As crianças escolhem o lado pelo nome.
   "Todos os lados" só aparece quando os lados têm todos o mesmo tamanho.
 - **Tema**: só conta para quem abre a página sem tema no endereço. Os QR do Halloween e do Natal já trazem o tema.
-- **Tempo** de cada mensagem, imagem e desenho.
+- **Tempo** de cada mensagem, imagem, efeito e desenho.
 - **Deixar escrever texto livre**: ligado de origem. Se o desligar, só se podem enviar as mensagens prontas.
 - **Aprovar cada pedido**: os pedidos ficam em "Por aprovar", com os botões Mostrar / Recusar.
 - **Códigos QR**: dois, um para cada tema, com o botão Copiar endereço. **Não mudam**: pode mudar lados ou tempos
@@ -85,6 +85,8 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
   de "Apagar todos os GIF" na app), vai buscá-lo ao site e envia-o outra vez.
 - **Imagem em todos os lados**: o ESP32 (firmware v90 ou mais nova) mostra até 4 GIF ao mesmo tempo, um por lado;
   a C3 (firmware v99 ou mais nova) também até 4, mas só enquanto houver memória (com Bluetooth ligado, 2 ou 3).
+- **Efeito** (v8): 6 efeitos por tema (Halloween: casa assombrada, olhos, fogo, relâmpagos…; Natal: neve, bengala
+  doce, árvore, estrelas, fogo de artifício…). O número de cada efeito é pedido à própria placa.
 - **Desenho**: 9 cores, com o tamanho do lado escolhido.
 - Quando não há mais pedidos, o cubo volta ao que mostrava antes.
 
