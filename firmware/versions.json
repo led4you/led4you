@@ -1,3 +1,3 @@
-[{ "version": 92, "manifest": "manifest-v92.json", "notes": "Settings and update pages: the help button no longer covers Back, and the top row hides while an update runs" },
- { "version": 91, "manifest": "manifest-v91.json", "notes": "New LED4YOU site address (led4you.github.io/led4you): updates, fonts and translations found again; Studio with the newest app fixes" },
- { "version": 90, "manifest": "manifest-v90.json", "notes": "Classic ESP32: up to 4 GIFs at the same time (one per side of a 4-sided cube)" }]
+[{ "version": 93, "manifest": "manifest-v93.json", "notes": "Translations: effect settings, zones and many board pages now fully in Portuguese, Spanish and French" },
+ { "version": 92, "manifest": "manifest-v92.json", "notes": "Settings and update pages: the help button no longer covers Back, and the top row hides while an update runs" },
+ { "version": 91, "manifest": "manifest-v91.json", "notes": "New LED4YOU site address (led4you.github.io/led4you): updates, fonts and translations found again; Studio with the newest app fixes" }]
