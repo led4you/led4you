@@ -416,9 +416,9 @@ pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:2
   <label for="theme">Tema de quem abre a página sem tema no endereço</label>
   <select id="theme"><option value="hw">Halloween</option><option value="xm">Natal</option><option value="ev">Outras festas</option><option value="">Todas</option></select>
   <div class="three">
-    <div><label for="sText">Texto (s)</label><input type="number" id="sText" min="3" max="120"></div>
-    <div><label for="sGif">Imagem (s)</label><input type="number" id="sGif" min="3" max="120"></div>
-    <div><label for="sDraw">Desenho (s)</label><input type="number" id="sDraw" min="3" max="120"></div>
+    <div><label for="sText">Texto (s)</label><input type="number" id="sText" min="3" max="300"></div>
+    <div><label for="sGif">Imagem (s)</label><input type="number" id="sGif" min="3" max="300"></div>
+    <div><label for="sDraw">Desenho (s)</label><input type="number" id="sDraw" min="3" max="300"></div>
     <div><label for="sFx">Efeito (s)</label><input type="number" id="sFx" min="3" max="300"></div>
   </div>
   <label for="wait">Espera entre pedidos do mesmo telemóvel (segundos, 0 = sem espera)</label>
