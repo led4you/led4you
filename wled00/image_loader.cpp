@@ -20,7 +20,8 @@
   #elif defined(LED4YOU_BLE) && !defined(CONFIG_IDF_TARGET_ESP32C3)
     #define L4Y_GIF_SLOTS 3
   #elif defined(LED4YOU_BLE) && defined(L4Y_GIF_SHARED_SCRATCH)
-    #define L4Y_GIF_SLOTS 2                        // C3 with the shared decoder working area: each more GIF needs ~1 KB
+    #define L4Y_GIF_SLOTS 4                        // C3 with the shared decoder working area: each more GIF needs ~1-2 KB
+                                                   // (v99: was 2; a GIF that finds no memory leaves its zone dark)
   #else
     #define L4Y_GIF_SLOTS 1
   #endif

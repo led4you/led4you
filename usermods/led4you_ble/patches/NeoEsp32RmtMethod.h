@@ -751,6 +751,8 @@ public:
                 }
                 _hubLane = h.lanes++;
                 h.pins[_hubLane] = _pin;
+                // v99: the DMA buffer is the copy being sent, so the second pixel buffer is not needed (~3 KB for 3 outputs)
+                free(_dataSending); _dataSending = nullptr;
                 if (_sizeData > h.maxData) h.maxData = _sizeData;
                 if (h.lanes == h.want) h.start();
                 l4ySpiLedsBusy() = true;   // the SPI is taken: any other output uses the RMT
@@ -816,9 +818,7 @@ public:
                     if (spi_device_queue_trans(h.dev, &h.t, 0) == ESP_OK) h.pending = true;
                 }
             }
-            if (maintainBufferConsistency) memcpy(_dataSending, _dataEditing, _sizeData);
-            std::swap(_dataSending, _dataEditing);
-            return;
+            return;   // one pixel buffer: it is encoded into the DMA buffer, nothing to swap
         }
         if (_spiDev)
         {
@@ -866,6 +866,9 @@ public:
 
     bool SwapBuffers()
     {
+#ifdef L4Y_SPI_LEDS
+        if (_hubLane >= 0) return false;   // quad SPI output: only one pixel buffer
+#endif
         std::swap(_dataSending, _dataEditing);
         return true;
     }
