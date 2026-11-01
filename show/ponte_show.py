@@ -38,7 +38,8 @@ S = {   # definições (guardadas em show_config.json)
     "seconds": {"text": 20, "gif": 12, "draw": 15, "fx": 180}, "theme": "hw", "approve": False,
     "wait": 0,            # segundos entre dois pedidos do mesmo telemóvel (0 = sem espera)
     "hold": False,        # True = o último pedido fica nas luzes até chegar outro (dá tempo para fotografias)
-    "wait_turn": False,   # False = um pedido novo substitui logo o que está no lado; True = espera que o anterior acabe
+    "wait_turn": False,
+    "fx_all": True,       # True = os visitantes também podem escolher qualquer efeito da placa (além das sugestões do tema)   # False = um pedido novo substitui logo o que está no lado; True = espera que o anterior acabe
     "free": True,         # True = escrever texto livre (com filtro de palavrões); False = só as mensagens prontas
 }
 # mensagens prontas (iguais às da página dos visitantes)
@@ -61,12 +62,41 @@ FX_NAMES = {k: n for v in FX_LIST.values() for k, n in v}
 fx_cache = {}         # placa -> (hora, lista dos nomes dos efeitos): o número de cada efeito vem da própria placa
 
 
-def fx_id(ip, name):
-    t, names = fx_cache.get(ip, (0, None))
+FX_SKIP = {"RSVD", "Image", "Scrolling Text", "My LEDs", "Solid", "Blink", "Blink Rainbow", "Strobe", "Strobe Rainbow",
+           "Strobe Mega", "Multi Strobe", "Lightning"}   # não fazem sentido como pedido (ou piscam demasiado para crianças)
+
+
+def fx_names(ip):
+    """os nomes dos efeitos da placa (a posição na lista é o número do efeito) e os dados de cada um"""
+    t, names, data = fx_cache.get(ip, (0, None, None))
     if not names or time.time() - t > 600:
         names = http_json(ip, "/json/eff")
-        fx_cache[ip] = (time.time(), names)
-    return names.index(name) if isinstance(names, list) and name in names else -1
+        try:
+            data = http_json(ip, "/json/fxdata")
+        except Exception:
+            data = None
+        fx_cache[ip] = (time.time(), names, data)
+    return names if isinstance(names, list) else [], data if isinstance(data, list) else []
+
+
+def fx_id(ip, name):
+    names, _ = fx_names(ip)
+    return names.index(name) if name in names else -1
+
+
+def board_fx(ip):
+    """os efeitos da placa que os visitantes podem escolher: sem os de som (precisam de microfone) e sem os da lista FX_SKIP"""
+    names, data = fx_names(ip)
+    out = []
+    for i, n in enumerate(names):
+        if not n or n in FX_SKIP or n.startswith("-") or n in out:
+            continue
+        d = data[i] if i < len(data) and isinstance(data[i], str) else ""
+        flags = d.split(";")[3] if d.count(";") >= 3 else ""
+        if "v" in flags or "f" in flags:
+            continue
+        out.append(n)
+    return sorted(out, key=str.lower)
 
 
 lock = threading.RLock()
@@ -201,9 +231,16 @@ def check(msg, allow_free=False):
         return "gif", segs({"fx": FX_IMAGE, "n": f, "sx": 128, "ix": 0, "c3": 0, "frz": False}), {"f": f, "where": where}
     if k == "fx":
         e = str(m.get("e", ""))
-        if e not in FX_NAMES:
-            return None
-        return "fx", segs({"fx": 0, "fxdef": True, "frz": False}), {"e": e, "n": FX_NAMES[e], "where": where}
+        if e in FX_NAMES:
+            n = FX_NAMES[e]
+        else:   # v12: um efeito qualquer da placa (se a opção estiver ligada)
+            n = str(m.get("n", ""))[:40]
+            try:
+                if not S.get("fx_all", True) or not S["board"] or n not in board_fx(S["board"]):
+                    return None
+            except Exception:
+                return None
+        return "fx", segs({"fx": 0, "fxdef": True, "frz": False}), {"e": e, "n": n, "where": where}
     if k == "draw":
         p = str(m.get("p", ""))
         w, h = m.get("w"), m.get("h")
@@ -356,6 +393,26 @@ def publish_status():
         urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-estado", data=body, headers={"Cache": "yes"}), timeout=10).read()
     except Exception as e:
         log("não consegui avisar a página do estado:", e)
+    publish_fx()
+
+
+def publish_fx():
+    """v12: a lista dos efeitos da placa para a página dos visitantes (num canal à parte: cabe nos 4 KB de uma mensagem)"""
+    try:
+        names = board_fx(S["board"]) if S.get("fx_all", True) and S["board"] else []
+    except Exception as e:
+        log("não consegui ler os efeitos da placa:", e)
+        return
+    try:
+        body = json.dumps({"fx": names, "at": int(time.time())}, ensure_ascii=False, separators=(",", ":")).encode()
+        if len(body) > 4000:   # mensagens maiores viram anexo no ntfy: corta a lista
+            while len(body) > 4000 and names:
+                names = names[:-5]
+                body = json.dumps({"fx": names, "at": int(time.time())}, ensure_ascii=False, separators=(",", ":")).encode()
+        urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-fx", data=body, headers={"Cache": "yes"}), timeout=10).read()
+        log("lista de %d efeitos enviada para a página dos visitantes" % len(names))
+    except Exception as e:
+        log("não consegui enviar a lista de efeitos:", e)
 
 
 def status_loop():
@@ -475,6 +532,8 @@ pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:2
   <input type="number" id="wait" min="0" max="600">
   <label class="big" style="font-size:16px"><input type="checkbox" id="hold"> Deixar o último pedido nas luzes até chegar outro</label>
   <div class="note">Dá tempo para tirar fotografias. Desligado: depois do tempo, as luzes voltam ao que mostravam antes.</div>
+  <label class="big" style="font-size:16px"><input type="checkbox" id="fxAll"> Mostrar aos visitantes todos os efeitos da placa</label>
+  <div class="note">Além das sugestões do tema. Ficam de fora os efeitos de som e os que piscam muito.</div>
   <label class="big" style="font-size:16px"><input type="checkbox" id="waitTurn"> Cada pedido espera que o anterior acabe</label>
   <div class="note">Desligado: um pedido novo substitui logo o que está nesse lado.</div>
   <label class="big" style="font-size:16px"><input type="checkbox" id="free"> Deixar escrever texto livre</label>
@@ -510,7 +569,7 @@ function render(){
  if(!editing){opt($('board'),[['','Escolha uma placa']].concat(st.boards.map(b=>[b.ip,b.name+' ('+b.ip+')'])).concat(st.board&&!st.boards.some(b=>b.ip===st.board)?[[st.board,(st.boardName||st.board)+' ('+st.board+')']]:[]),st.board);
   if(zonesFor!==st.board){zonesFor=st.board;loadZones(st.board,st.faces);}
   $('free').checked=st.free;
-  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('waitTurn').checked=!!st.wait_turn;$('approve').checked=st.approve;}
+  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('waitTurn').checked=!!st.wait_turn;$('fxAll').checked=st.fx_all!==false;$('approve').checked=st.approve;}
  const qk=st.urls.hw+st.urls.xm;$('url_hw').textContent=st.urls.hw;$('url_xm').textContent=st.urls.xm;
  if(qrFor!==qk&&window.QRCode){for(const t of ['hw','xm']){$('qr_'+t).replaceChildren();new QRCode($('qr_'+t),{text:st.urls[t],width:200,height:200,correctLevel:QRCode.CorrectLevel.M});}qrFor=qk;}
  $('pendCard').hidden=!st.pending.length;
@@ -524,12 +583,12 @@ function render(){
 async function refresh(){st=await api('state');render();}
 $('on').onchange=()=>api('settings',{on:$('on').checked}).then(refresh);
 $('board').onfocus=()=>editing=true;
-['sText','sGif','sDraw','sFx','wait','theme','approve','free','hold','waitTurn'].forEach(id=>{const e=$(id);e.addEventListener('focus',()=>editing=true);e.addEventListener('input',()=>editing=true);e.addEventListener('change',()=>editing=true);});   // v9: the 3 s refresh no longer puts back the old times while typing
+['sText','sGif','sDraw','sFx','wait','theme','approve','free','hold','waitTurn','fxAll'].forEach(id=>{const e=$(id);e.addEventListener('focus',()=>editing=true);e.addEventListener('input',()=>editing=true);e.addEventListener('change',()=>editing=true);});   // v9: the 3 s refresh no longer puts back the old times while typing
 $('board').onchange=()=>{editing=true;loadZones($('board').value,[]);};$('free').onchange=()=>editing=true;$('hold').onchange=()=>editing=true;$('wait').oninput=()=>editing=true;
 $('scan').onclick=async()=>{$('scanMsg').textContent='A procurar… (até 10 s)';const r=await api('scan',{});$('scanMsg').textContent=r.length+' placa(s) encontrada(s)';editing=false;await refresh();};
 $('save').onclick=async()=>{const b=st.boards.find(x=>x.ip===$('board').value);const faces=facesNow();
  if(!faces.length){$('saveMsg').textContent='Marque pelo menos um lado.';return;}
- await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,hold:$('hold').checked,wait_turn:$('waitTurn').checked,wait:Math.max(0,Math.min(600,+$('wait').value|0)),seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value}});
+ await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,hold:$('hold').checked,wait_turn:$('waitTurn').checked,fx_all:$('fxAll').checked,wait:Math.max(0,Math.min(600,+$('wait').value|0)),seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value}});
  editing=false;$('saveMsg').textContent='Guardado.';setTimeout(()=>$('saveMsg').textContent='',2500);refresh();};
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(st.urls[b.dataset.copy]).then(()=>{b.textContent='Copiado';setTimeout(()=>b.textContent='Copiar endereço',2000);}));
 $('test').onclick=()=>api('test',{t:$('testTxt').value||'Ola!'}).then(refresh);
@@ -584,7 +643,7 @@ class Admin(BaseHTTPRequestHandler):
         if p == "/api/settings":
             changed_on = "on" in b and bool(b["on"]) != S["on"]
             with lock:
-                for k in ("on", "approve", "free", "hold", "wait_turn"):
+                for k in ("on", "approve", "free", "hold", "wait_turn", "fx_all"):
                     if k in b:
                         S[k] = bool(b[k])
                 if "board" in b and (b["board"] == "" or re.fullmatch(r"[0-9.]{7,15}", str(b["board"]))):

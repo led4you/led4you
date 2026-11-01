@@ -1,4 +1,4 @@
-# Cubo das crianças (LED4YOU) — v11
+# Cubo das crianças (LED4YOU) — v12
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
@@ -91,6 +91,8 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
   a C3 (firmware v99 ou mais nova) também até 4, mas só enquanto houver memória (com Bluetooth ligado, 2 ou 3).
 - **Efeito** (v8): 6 efeitos por tema (Halloween: casa assombrada, olhos, fogo, relâmpagos…; Natal: neve, bengala
   doce, árvore, estrelas, fogo de artifício…). O número de cada efeito é pedido à própria placa.
+  Por baixo, **todos os efeitos da placa** (v12), com caixa de procura; ficam de fora os de som e os que piscam
+  muito. Desliga-se na página de controlo em "Mostrar aos visitantes todos os efeitos da placa".
 - **Desenho**: 9 cores, com o tamanho do lado escolhido.
 - Quando um lado acaba e não tem mais pedidos, volta ao que mostrava antes.
 

@@ -21,7 +21,7 @@ h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.15; }
 .tabs button { min-height: 52px; border: 0; border-radius: 14px; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 15px; padding: 0 2px; cursor: pointer; }
 .tabs button[aria-selected="true"] { background: var(--raise); color: var(--fg); }
 .lab { font-size: 15px; color: var(--muted); font-weight: 600; }
-input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 19px; }
+input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 19px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { min-height: 48px; padding: 8px 16px; border-radius: 999px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; }
 .chip[aria-pressed="true"] { border-color: var(--hot); }
@@ -51,7 +51,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
     <div class="kick" id="kick">Light Show Biscoitos</div>
     <h1>Põe a tua mensagem nas luzes!</h1>
   </div>
-  <p class="note" id="intro">Escolhe uma mensagem, uma imagem, um efeito ou faz um desenho. Aparece nas luzes daqui a pouco, um pedido de cada vez.</p>
+  <p class="note" id="intro">Escolhe uma mensagem, uma imagem, um efeito ou faz um desenho. Aparece nas luzes daqui a pouco.</p>
   <p class="msg err" id="noShow" hidden>Este endereço não está completo. Lê outra vez o código QR da parede.</p>
   <p class="msg err" id="closed" hidden>As luzes não estão a receber pedidos agora. Volta a tentar mais logo!</p>
 
@@ -87,6 +87,11 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
   <section class="card" id="pFx" hidden>
     <div class="lab">Escolhe um efeito</div>
     <div class="chips" id="fxs"></div>
+    <div id="fxAllBox" hidden>
+      <div class="lab">Todos os efeitos das luzes</div>
+      <input type="search" id="fxFind" placeholder="Procurar um efeito" autocomplete="off">
+      <div class="chips" id="fxAll"></div>
+    </div>
   </section>
 
   <section class="card" id="pDraw" hidden>
@@ -177,17 +182,29 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 		xm: [['snowfall', '❄️ Neve a cair'], ['candy', '🍬 Bengala doce'], ['retro', '🎄 Árvore de Natal'], ['twinkle', '✨ Estrelas a piscar'], ['fireworks', '🎆 Fogo de artifício'], ['bursts', '💥 Explosões de cor']],
 		ev: [['rainbow', '🌈 Arco-íris'], ['fireworks', '🎆 Fogo de artifício'], ['plasma', '🔮 Bola de plasma'], ['ripple', '💧 Ondas'], ['matrix', '💚 Chuva de letras'], ['pacifica', '🌊 Mar']]
 	};
-	let fx = null;
+	// fx = 'e:<key>' (a suggestion above) or 'n:<effect name>' (any effect of the lights, list sent by the bridge)
+	let fx = null, boardFx = [];
+	const fxChip = (id, label) => {
+		const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = label; b.setAttribute('aria-pressed', String(id === fx));
+		b.onclick = () => { fx = id; drawFx(); };
+		return b;
+	};
 	const drawFx = () => {
 		const seen = new Set();
 		const list = (FXS[cfg.theme] || [].concat(FXS.hw, FXS.xm, FXS.ev)).filter(([k]) => !seen.has(k) && seen.add(k));
-		if (!list.some(([k]) => k === fx)) fx = list[0][0];
-		$('fxs').replaceChildren(...list.map(([k, n]) => {
-			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = n; b.setAttribute('aria-pressed', String(k === fx));
-			b.onclick = () => { fx = k; drawFx(); };
-			return b;
-		}));
+		if (!fx) fx = 'e:' + list[0][0];
+		$('fxs').replaceChildren(...list.map(([k, n]) => fxChip('e:' + k, n)));
+		$('fxAllBox').hidden = !boardFx.length;
+		const f = $('fxFind').value.trim().toLowerCase();
+		$('fxAll').replaceChildren(...boardFx.filter(n => !f || n.toLowerCase().includes(f)).map(n => fxChip('n:' + n, n)));
 	};
+	$('fxFind').oninput = () => drawFx();
+	const loadBoardFx = () => fetch(RELAY + TOPIC + '-fx/json?poll=1&since=all').then(r => r.text()).then(txt => {
+		const last = txt.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
+		let m = null; try { m = last && JSON.parse(last.message); } catch (e) {}
+		boardFx = m && Array.isArray(m.fx) ? m.fx.filter(n => typeof n === 'string').map(n => n.slice(0, 40)).slice(0, 300) : [];
+		drawFx();
+	}).catch(() => {});
 
 	// ---- pictures (the LED4YOU GIF pack) ----
 	let gif = null, pack = [];
@@ -274,7 +291,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 			body = { k: 'gif', f: gif };
 		} else if (tab === 'fx') {
 			if (!fx) { say('Escolhe primeiro um efeito.', 'err'); return; }
-			body = { k: 'fx', e: fx };
+			body = fx.startsWith('e:') ? { k: 'fx', e: fx.slice(2) } : { k: 'fx', n: fx.slice(2) };
 		} else {
 			if (!pixels.some(v => v)) { say('Faz primeiro um desenho.', 'err'); return; }
 			body = { k: 'draw', w: gw, h: gh, p: pixels.join('') };
@@ -291,7 +308,7 @@ input[type=text] { width: 100%; min-height: 52px; padding: 10px 14px; border-rad
 	};
 
 	apply();
-	if (TOPIC) { checkOpen(); setInterval(checkOpen, 60000); }
+	if (TOPIC) { checkOpen(); setInterval(checkOpen, 60000); loadBoardFx(); setInterval(loadBoardFx, 600000); }
 })();
 </script>
 </body>
