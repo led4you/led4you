@@ -76,8 +76,8 @@ constexpr size_t  WLED_MAX_USERMOD_PALETTES     = WLED_USERMOD_PALETTE_ID_BASE -
   #define WLED_MAX_ANALOG_CHANNELS (LEDC_CHANNEL_MAX*LEDC_SPEED_MODE_MAX)
   #if defined(CONFIG_IDF_TARGET_ESP32C3)    // 2 RMT, 6 LEDC, only has 1 I2S but NPB does not support it ATM
     #ifdef LED4YOU_BLE
-    #define WLED_MAX_RMT_CHANNELS 3         // LED4YOU: output 1 on SPI + DMA, output 2 on RMT (both memory blocks);
-                                            // a 3rd output (test mode in the app) splits the RMT: one block each
+    #define WLED_MAX_RMT_CHANNELS 4         // LED4YOU: 1-2 outputs: SPI + DMA and RMT (both memory blocks);
+                                            // 3-4 outputs: all on the SPI in quad mode (one data line each)
     #else
     #define WLED_MAX_RMT_CHANNELS 2         // ESP32-C3 has 2 RMT output channels
     #endif

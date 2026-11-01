@@ -56,8 +56,95 @@ extern "C"
 #include <esp_heap_caps.h>
 #define L4Y_SPI_LEDS 1
 inline bool& l4ySpiLedsBusy() { static bool busy = false; return busy; }
+#include <driver/gpio.h>
+#include <soc/gpio_struct.h>
+#include <soc/gpio_sig_map.h>
 #endif
 }
+
+#ifdef L4Y_SPI_LEDS
+// LED4YOU (patch, firmware v96): 3 or 4 LED outputs on the ESP32-C3 all go out together over SPI in quad mode:
+// the 4 SPI data lines (D, Q, WP, HD) each carry one output, from one DMA buffer, so no output uses the RMT
+// (2 RMT outputs with half the memory each froze the LEDs while Bluetooth was on). One LED bit = 3 SPI clocks;
+// in quad mode one clock carries one bit of every output: the first clock of a byte uses bits 7..4
+// (HD, WP, Q, D), the second bits 3..0.
+struct L4yQuadHub {
+    int alive = 0;            // WS281x-type outputs that exist (all are made before the first one starts)
+    int want = 0, lanes = 0;  // outputs on the quad SPI: expected, started
+    uint8_t pins[4] = {255, 255, 255, 255};
+    size_t maxData = 0;       // biggest output, in data bytes
+    uint8_t* buf = nullptr;   // DMA buffer: reset (low) slots, then 3 slots per LED data bit, 2 slots per byte
+    size_t len = 0, lead = 0; // bytes; reset slots at the start
+    uint32_t slotNs = 0; uint8_t ones0 = 1, ones1 = 2; uint32_t resetNs = 0;
+    spi_device_handle_t dev = nullptr;
+    spi_transaction_t t;
+    bool pending = false, failed = false;
+    bool wait(uint32_t ms) {
+        if (!pending) return true;
+        spi_transaction_t* r;
+        if (spi_device_get_trans_result(dev, &r, ms ? pdMS_TO_TICKS(ms) : 0) != ESP_OK) return false;
+        pending = false;
+        return true;
+    }
+    void stop() {
+        if (dev) { wait(1000); spi_bus_remove_device(dev); spi_bus_free(SPI2_HOST); dev = nullptr; }
+        for (int i = 0; i < 4; i++) if (pins[i] != 255) { gpio_matrix_out(pins[i], SIG_GPIO_OUT_IDX, false, false); pinMode(pins[i], INPUT); pins[i] = 255; }
+        heap_caps_free(buf); buf = nullptr; len = 0; maxData = 0; lanes = 0; want = 0; pending = false; failed = false;
+        l4ySpiLedsBusy() = false;
+    }
+    bool start() {
+        const size_t slots = lead + maxData * 24 + 16;
+        len = (slots + 1) / 2;
+        if (len * 8 > 262143) { failed = true; return false; }   // longer than one SPI transfer on the C3
+        buf = static_cast<uint8_t*>(heap_caps_calloc(1, len, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
+        if (!buf) { failed = true; return false; }
+        spi_bus_config_t bus = {};
+        bus.mosi_io_num = pins[0];
+        bus.miso_io_num = pins[1];
+        bus.quadwp_io_num = pins[2];
+        bus.quadhd_io_num = want > 3 ? pins[3] : pins[2];   // 3 outputs: HD is set up on the WP pin, then taken off it below
+        bus.sclk_io_num = -1;
+        bus.max_transfer_sz = len;
+        bus.flags = SPICOMMON_BUSFLAG_MASTER | SPICOMMON_BUSFLAG_GPIO_PINS;
+        if (spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO) != ESP_OK) { heap_caps_free(buf); buf = nullptr; failed = true; return false; }
+        spi_device_interface_config_t d = {};
+        d.clock_speed_hz = 1000000000UL / slotNs;
+        d.mode = 0;
+        d.spics_io_num = -1;
+        d.queue_size = 1;
+        d.flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_NO_DUMMY;
+        if (spi_bus_add_device(SPI2_HOST, &d, &dev) != ESP_OK) { dev = nullptr; spi_bus_free(SPI2_HOST); heap_caps_free(buf); buf = nullptr; failed = true; return false; }
+        // each output pin: its SPI data line, always driven (also between frames, so the LEDs see a steady low)
+        static const uint8_t sig[4] = { FSPID_OUT_IDX, FSPIQ_OUT_IDX, FSPIWP_OUT_IDX, FSPIHD_OUT_IDX };
+        for (int i = 0; i < want; i++) {
+            gpio_set_direction(static_cast<gpio_num_t>(pins[i]), GPIO_MODE_OUTPUT);
+            gpio_matrix_out(pins[i], sig[i], false, false);
+            GPIO.func_out_sel_cfg[pins[i]].oen_sel = 1;
+        }
+        return true;
+    }
+    // writes one output's LED data into its line of the DMA buffer
+    void encode(int lane, const uint8_t* src, size_t n) {
+        uint8_t* b = buf;
+        const uint8_t mHi = 1u << (4 + lane), mLo = 1u << lane;
+        size_t t = lead;
+        const bool s1for0 = ones0 >= 2, s1for1 = ones1 >= 2, s2for1 = ones1 >= 3;
+        for (size_t i = 0; i < n; i++) {
+            const uint8_t v = src[i];
+            for (int bit = 7; bit >= 0; bit--) {
+                const bool one = (v >> bit) & 1;
+                const bool sl[3] = { true, one ? s1for1 : s1for0, one && s2for1 };
+                for (int k = 0; k < 3; k++, t++) {
+                    uint8_t& c = b[t >> 1];
+                    const uint8_t m = (t & 1) ? mLo : mHi;
+                    if (sl[k]) c |= m; else c &= ~m;
+                }
+            }
+        }
+    }
+};
+inline L4yQuadHub& l4yHub() { static L4yQuadHub h; return h; }
+#endif
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 0)
 #define NEOPIXELBUS_RMT_INT_FLAGS (ESP_INTR_FLAG_LOWMED)
@@ -592,6 +679,16 @@ public:
     ~NeoEsp32RmtMethodBase()
     {
 #ifdef L4Y_SPI_LEDS
+        if (_cand) l4yHub().alive--;
+        if (_hubLane >= 0)
+        {
+            L4yQuadHub& h = l4yHub();
+            h.wait(1000);
+            if (--h.lanes <= 0) h.stop();
+            free(_dataEditing);
+            free(_dataSending);
+            return;
+        }
         if (_spiDev)
         {
             spiWait(1000);
@@ -623,6 +720,7 @@ public:
     bool IsReadyToUpdate() const
     {
 #ifdef L4Y_SPI_LEDS
+        if (_hubLane >= 0) return l4yHub().wait(0);
         if (_spiDev) return spiWait(0);
 #endif
         if (_rmtCh >= RMT_CHANNEL_MAX) return true;
@@ -632,6 +730,33 @@ public:
     void Initialize()
     {
 #ifdef L4Y_SPI_LEDS
+        {
+            // 3 or 4 WS281x-type outputs: all of them on the quad SPI (all outputs are made before the first starts)
+            L4yQuadHub& h = l4yHub();
+            if (_cand && h.alive >= 3 && !h.failed && !h.dev && h.lanes < 4)
+            {
+                if (h.lanes == 0) {
+                    h.want = h.alive > 4 ? 4 : h.alive;
+                    const uint32_t tickNs = 1000000000UL / (80000000UL / T_SPEED::RmtClockDivider);
+                    const uint32_t h0 = (T_SPEED::RmtBit0 & 0x7fff) * tickNs, l0 = ((T_SPEED::RmtBit0 >> 16) & 0x7fff) * tickNs;
+                    const uint32_t h1 = (T_SPEED::RmtBit1 & 0x7fff) * tickNs;
+                    h.slotNs = (h0 + l0) / 3;
+                    uint32_t o0 = (h0 + h.slotNs / 2) / h.slotNs, o1 = (h1 + h.slotNs / 2) / h.slotNs;
+                    if (o0 < 1) o0 = 1;
+                    if (o1 > 2) o1 = 2;
+                    if (o1 <= o0) { o0 = 1; o1 = 2; }
+                    h.ones0 = o0; h.ones1 = o1;
+                    h.resetNs = (uint32_t)T_SPEED::RmtDurationReset * tickNs;
+                    h.lead = ((h.resetNs + h.slotNs - 1) / h.slotNs + 8) & ~1u;   // reset time in slots, even
+                }
+                _hubLane = h.lanes++;
+                h.pins[_hubLane] = _pin;
+                if (_sizeData > h.maxData) h.maxData = _sizeData;
+                if (h.lanes == h.want) h.start();
+                l4ySpiLedsBusy() = true;   // the SPI is taken: any other output uses the RMT
+                return;
+            }
+        }
         if (T_SPEED::IdleLevel == RMT_IDLE_LEVEL_LOW && !l4ySpiLedsBusy() && spiInit()) return;
 #endif
         rmt_config_t config = {};
@@ -676,6 +801,25 @@ public:
     void Update(bool maintainBufferConsistency)
     {
 #ifdef L4Y_SPI_LEDS
+        if (_hubLane >= 0)
+        {
+            L4yQuadHub& h = l4yHub();
+            if (h.dev && h.wait(1000))
+            {
+                h.encode(_hubLane, _dataEditing, _sizeData);
+                if (_hubLane == h.lanes - 1)   // the last output of the frame sends all of them
+                {
+                    memset(&h.t, 0, sizeof(h.t));
+                    h.t.length = h.len * 8;
+                    h.t.tx_buffer = h.buf;
+                    h.t.flags = SPI_TRANS_MODE_QIO;
+                    if (spi_device_queue_trans(h.dev, &h.t, 0) == ESP_OK) h.pending = true;
+                }
+            }
+            if (maintainBufferConsistency) memcpy(_dataSending, _dataEditing, _sizeData);
+            std::swap(_dataSending, _dataEditing);
+            return;
+        }
         if (_spiDev)
         {
             if (!spiWait(1000)) return;     // last frame still going (should never take this long)
@@ -714,6 +858,9 @@ public:
     bool AlwaysUpdate()
     {
         // this method requires update to be called only if changes to buffer
+#ifdef L4Y_SPI_LEDS
+        return _hubLane >= 0;   // LED4YOU (patch): on the quad SPI the last output sends all of them every frame
+#endif
         return false;
     }
 
@@ -749,6 +896,8 @@ private:
 
 
 #ifdef L4Y_SPI_LEDS
+    bool _cand = false;       // WS281x-type output (data idles low): can go on the SPI
+    int _hubLane = -1;        // line on the quad SPI, or -1
     spi_device_handle_t _spiDev = nullptr;
     uint8_t* _spiBuf = nullptr;      // DMA buffer: reset (low) bytes, then 3 SPI bits per LED data bit
     size_t _spiLen = 0;
@@ -825,6 +974,10 @@ private:
 
     void construct()
     {
+#ifdef L4Y_SPI_LEDS
+        _cand = T_SPEED::IdleLevel == RMT_IDLE_LEVEL_LOW;
+        if (_cand) l4yHub().alive++;
+#endif
         _rmtCh = static_cast<rmt_channel_t>(_channel.RmtChannelNumber);
         _dataEditing = static_cast<uint8_t*>(malloc(_sizeData));
         // data cleared later in Begin()

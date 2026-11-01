@@ -13,7 +13,7 @@
 #include "wled.h"
 #include <WiFiUdp.h>
 
-#define L4Y_FW_VERSION 95      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
+#define L4Y_FW_VERSION 96      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
 #define L4Y_HOUSE_PORT 21329   // UDP port for house scenes ("L4YS" packets)
 extern const int l4yFwVersion = L4Y_FW_VERSION;   // shown by Improv (installer, Wi-Fi setup) as "v.."
 
@@ -384,8 +384,8 @@ class Led4youExtras : public Usermod {
       }
       return h;
     }
-    void saveZones() {
-      if (!requestJSONBufferLock(JSON_LOCK_REMOTE)) return;
+    bool saveZones() {   // false: the JSON buffer was busy (e.g. the app reading over Bluetooth), try again later
+      if (!requestJSONBufferLock(JSON_LOCK_REMOTE)) return false;
       pDoc->clear();
       JsonObject o = pDoc->to<JsonObject>();
       o["b"] = busSig();
@@ -397,12 +397,16 @@ class Led4youExtras : public Usermod {
         a.add(i); a.add(g.start); a.add(g.stop); a.add(g.startY); a.add(g.stopY); a.add(zOpts(g)); a.add(g.grouping); a.add(g.spacing); a.add(g.offset);
       }
       File f = WLED_FS.open(F("/l4yzones.json"), "w");
-      if (f) { serializeJson(*pDoc, f); f.close(); }
+      bool ok = false;
+      if (f) { ok = serializeJson(*pDoc, f) > 0; f.close(); }
       releaseJSONBufferLock();
+      return ok;
     }
-    void restoreZones() {
-      if (bootPreset > 0 || !WLED_FS.exists(F("/l4yzones.json"))) return;
-      if (!requestJSONBufferLock(JSON_LOCK_REMOTE)) return;
+    // false only when the JSON buffer was busy: try again a moment later (the zones were lost when the app was
+    // reading over Bluetooth right at start-up, and the next change then wrote the default zones over the saved ones)
+    bool restoreZones() {
+      if (bootPreset > 0 || !WLED_FS.exists(F("/l4yzones.json"))) return true;
+      if (!requestJSONBufferLock(JSON_LOCK_REMOTE)) return false;
       File f = WLED_FS.open(F("/l4yzones.json"), "r");
       bool ok = f && !deserializeJson(*pDoc, f);
       if (f) f.close();
@@ -429,10 +433,12 @@ class Led4youExtras : public Usermod {
           pDoc->set(cmd);
           deserializeState(pDoc->as<JsonObject>(), CALL_MODE_INIT);
           releaseJSONBufferLock();
+          return true;
         }
-        return;
+        return false;
       }
       releaseJSONBufferLock();
+      return true;
     }
     void runZoneMemory() {
       const uint32_t now = millis();
@@ -440,7 +446,7 @@ class Led4youExtras : public Usermod {
       zonesCheckAt = now + 2000;
       if (!zonesRestored) {
         if (now < 3000 || strip.isUpdating()) return;   // let the LED outputs and the boot finish first
-        restoreZones();
+        if (!restoreZones() && now < 60000) { zonesCheckAt = now + 300; return; }   // JSON buffer busy: again soon
         zonesRestored = true;
         zonesSavedSig = zonesSig = zoneSig();
         zonesSavedCount = zoneCount();
@@ -454,7 +460,8 @@ class Led4youExtras : public Usermod {
         // and kept new zones from being saved: they were gone after a restart)
         const unsigned n = zoneCount();
         if ((errorFlag == ERR_NORAM || errorFlag == ERR_NORAM_PX) && n < zonesSavedCount) return;
-        saveZones(); zonesSavedSig = sg; zonesSavedCount = n;
+        if (!saveZones()) { zonesCheckAt = now + 500; return; }   // busy: try again, do not mark it saved
+        zonesSavedSig = sg; zonesSavedCount = n;
       }
     }
     // AI: end

@@ -698,7 +698,7 @@ class Led4youBle : public Usermod {
 #endif
       out = F("{\"d\":"); out += dg; out += F(",\"z\":"); out += zj; out += F(",\"pn\":"); out += pj; out += F(",\"dx\":"); out += dx; out += F(",\"o\":"); out += oj; out += F(",\"mo\":");
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
-      out += F("2,\"mt\":3");   // C3: 2 steady outputs; a 3rd only in the app's test mode (less steady with Bluetooth)
+      out += F("4,\"mt\":4,\"c3\":1");   // C3: up to 4 outputs (3-4 of them all on the quad SPI, firmware v96)
 #else
       out += (WLED_MAX_RMT_CHANNELS > 4 ? 4 : WLED_MAX_RMT_CHANNELS); out += F(",\"mt\":"); out += (WLED_MAX_DIGITAL_CHANNELS > 8 ? 8 : WLED_MAX_DIGITAL_CHANNELS);
 #endif
