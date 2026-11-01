@@ -60,7 +60,7 @@ Cada zona é uma matriz com o seu tamanho.
 - **Lados do cubo**: marque as zonas que são lados e dê-lhes um nome. As crianças escolhem o lado pelo nome.
   "Todos os lados" só aparece quando os lados têm todos o mesmo tamanho.
 - **Tema**: só conta para quem abre a página sem tema no endereço. Os QR do Halloween e do Natal já trazem o tema.
-- **Tempo** de cada mensagem, imagem, efeito e desenho.
+- **Tempo** de cada mensagem, imagem, efeito (3 minutos de origem) e desenho.
 - **Espera entre pedidos do mesmo telemóvel**: 0 de origem (sem espera).
 - **Deixar o último pedido nas luzes até chegar outro**: dá tempo para tirar fotografias.
 - **Deixar escrever texto livre**: ligado de origem. Se o desligar, só se podem enviar as mensagens prontas.

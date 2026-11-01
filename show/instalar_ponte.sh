@@ -44,7 +44,7 @@ GIF_OK = re.compile(r"^(hw|xm|ev)-[a-z0-9]{2,20}\.gif$")
 S = {   # definições (guardadas em show_config.json)
     "on": False, "topic": "l4yshow-3352b4beefd1", "board": "", "boardName": "",
     "faces": [],          # lados (zonas) onde aparecem os pedidos: [{"zone": id, "n": nome, "w": largura, "h": altura}]
-    "seconds": {"text": 20, "gif": 12, "draw": 15, "fx": 30}, "theme": "hw", "approve": False,
+    "seconds": {"text": 20, "gif": 12, "draw": 15, "fx": 180}, "theme": "hw", "approve": False,
     "wait": 0,            # segundos entre dois pedidos do mesmo telemóvel (0 = sem espera)
     "hold": False,        # True = o último pedido fica nas luzes até chegar outro (dá tempo para fotografias)
     "free": True,         # True = escrever texto livre (com filtro de palavrões); False = só as mensagens prontas
@@ -467,7 +467,7 @@ function render(){
  if(!editing){opt($('board'),[['','Escolha uma placa']].concat(st.boards.map(b=>[b.ip,b.name+' ('+b.ip+')'])).concat(st.board&&!st.boards.some(b=>b.ip===st.board)?[[st.board,(st.boardName||st.board)+' ('+st.board+')']]:[]),st.board);
   if(zonesFor!==st.board){zonesFor=st.board;loadZones(st.board,st.faces);}
   $('free').checked=st.free;
-  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||30;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('approve').checked=st.approve;}
+  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('approve').checked=st.approve;}
  const qk=st.urls.hw+st.urls.xm;$('url_hw').textContent=st.urls.hw;$('url_xm').textContent=st.urls.xm;
  if(qrFor!==qk&&window.QRCode){for(const t of ['hw','xm']){$('qr_'+t).replaceChildren();new QRCode($('qr_'+t),{text:st.urls[t],width:200,height:200,correctLevel:QRCode.CorrectLevel.M});}qrFor=qk;}
  $('pendCard').hidden=!st.pending.length;
