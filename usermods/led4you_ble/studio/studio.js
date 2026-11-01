@@ -1702,7 +1702,7 @@
 			const x = new XMLHttpRequest();
 			x.open('POST', '/update');
 			x.upload.onprogress = e => { if (e.lengthComputable) { setBar(0.5 + 0.5 * e.loaded / e.total); status.textContent = 'Sending to the lights… ' + Math.round(100 * e.loaded / e.total) + '%'; } };
-			x.onload = () => x.status === 200 ? ok() : bad(new Error((x.responseText || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) || ('HTTP ' + x.status)));
+			x.onload = () => x.status === 200 ? ok() : bad(new Error((x.responseText || '').replace(/<(script|style|title|head)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) || ('HTTP ' + x.status)));
 			x.onerror = () => bad(new Error('network'));
 			x.send(fd);
 		});
