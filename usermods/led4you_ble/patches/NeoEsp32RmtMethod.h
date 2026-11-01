@@ -606,6 +606,7 @@ public:
             return;
         }
 #endif
+        if (_rmtCh >= RMT_CHANNEL_MAX) { free(_dataEditing); free(_dataSending); return; }   // LED4YOU (patch): output with no RMT channel
         // wait until the last send finishes before destructing everything
         // arbitrary time out of 10 seconds
         ESP_ERROR_CHECK_WITHOUT_ABORT(rmt_wait_tx_done(_rmtCh, 10000 / portTICK_PERIOD_MS));
@@ -624,6 +625,7 @@ public:
 #ifdef L4Y_SPI_LEDS
         if (_spiDev) return spiWait(0);
 #endif
+        if (_rmtCh >= RMT_CHANNEL_MAX) return true;
         return rmt_wait_tx_done(_rmtCh, 0) == ESP_OK;   // LED4YOU (patch): no logging of the normal "still sending" timeout
     }
 
@@ -638,14 +640,21 @@ public:
 #if defined(CONFIG_IDF_TARGET_ESP32C3) && defined(LED4YOU_BLE)
         // LED4YOU (patch): the first output went to SPI, so RMT channel 0 is free: the second output (channel 1)
         // takes channel 0 and both RMT memory blocks
-        if (_rmtCh == RMT_CHANNEL_1 && l4ySpiLedsBusy()) _rmtCh = RMT_CHANNEL_0;
+        if (l4ySpiLedsBusy() && _rmtCh >= RMT_CHANNEL_1 && _rmtCh <= RMT_CHANNEL_2) _rmtCh = static_cast<rmt_channel_t>(_rmtCh - 1);
+        if (_rmtCh > RMT_CHANNEL_1) { _rmtCh = RMT_CHANNEL_MAX; return; }   // the C3 has only 2 RMT outputs: no LEDs here
+        // a second RMT output (test mode: 3rd LED output) needs the memory block that channel 0 borrowed: give it back first
+        if (_rmtCh == RMT_CHANNEL_1)
+        {
+            rmt_wait_tx_done(RMT_CHANNEL_0, pdMS_TO_TICKS(100));
+            rmt_set_mem_block_num(RMT_CHANNEL_0, 1);
+        }
 #endif
         config.channel = _rmtCh;
         config.gpio_num = static_cast<gpio_num_t>(_pin);
 #if defined(CONFIG_IDF_TARGET_ESP32C3) && defined(LED4YOU_BLE)
         // LED4YOU (patch): one output on the C3 uses both RMT memory blocks, so the refill interrupt comes half as
         // often and Bluetooth/Wi-Fi interrupts no longer starve it (wrong colours on some LEDs)
-        config.mem_block_num = (_rmtCh == RMT_CHANNEL_0) ? 2 : 1;
+        config.mem_block_num = (_rmtCh == RMT_CHANNEL_0) ? 2 : 1;   // a later 3rd output takes the 2nd block back (above)
 #else
         config.mem_block_num = 1;
 #endif
@@ -680,6 +689,7 @@ public:
             return;
         }
 #endif
+        if (_rmtCh >= RMT_CHANNEL_MAX) return;   // LED4YOU (patch): output with no RMT channel
         // wait for not actively sending data
         // this will time out at 10 seconds, an arbitrarily long period of time
         // and do nothing if this happens

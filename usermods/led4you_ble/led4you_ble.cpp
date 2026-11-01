@@ -681,7 +681,13 @@ class Led4youBle : public Usermod {
 #else
       dx = F("null");
 #endif
-      out = F("{\"d\":"); out += dg; out += F(",\"z\":"); out += zj; out += F(",\"pn\":"); out += pj; out += F(",\"dx\":"); out += dx; out += F(",\"o\":"); out += oj; out += F(",\"mo\":"); out += (WLED_MAX_RMT_CHANNELS > 4 ? 4 : WLED_MAX_RMT_CHANNELS); out += F(",\"m\":"); out += mapFile ? 1 : 0; out += F(",\"f\":"); out += fontCount; out += F(",\"g\":"); out += gifJson; out += F(",\"p\":"); out += presetJson; out += F(",\"x\":"); out += x; out += '}';
+      out = F("{\"d\":"); out += dg; out += F(",\"z\":"); out += zj; out += F(",\"pn\":"); out += pj; out += F(",\"dx\":"); out += dx; out += F(",\"o\":"); out += oj; out += F(",\"mo\":");
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+      out += F("2,\"mt\":3");   // C3: 2 steady outputs; a 3rd only in the app's test mode (less steady with Bluetooth)
+#else
+      out += (WLED_MAX_RMT_CHANNELS > 4 ? 4 : WLED_MAX_RMT_CHANNELS); out += F(",\"mt\":"); out += (WLED_MAX_DIGITAL_CHANNELS > 8 ? 8 : WLED_MAX_DIGITAL_CHANNELS);
+#endif
+       out += F(",\"m\":"); out += mapFile ? 1 : 0; out += F(",\"f\":"); out += fontCount; out += F(",\"g\":"); out += gifJson; out += F(",\"p\":"); out += presetJson; out += F(",\"x\":"); out += x; out += '}';
       if (out == lastList) return;
       lastList = out;
       // a Bluetooth value holds at most 512 bytes: the list is cut into pages "~" + page + count + up to 480 bytes,
