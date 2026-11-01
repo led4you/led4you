@@ -15,6 +15,13 @@ A rede de casa nunca fica aberta para a internet: é a ponte, em casa, que vai b
 
 ## 1. Instalar a ponte (uma vez)
 
+**Mais fácil, num Pi com o Falcon Player (FPP), sem comandos:** na página do FPP vá a **Content Setup › File Manager**,
+separador **Scripts**, carregue em **Upload** e escolha `instalar_ponte.sh`. Depois, na linha do ficheiro, carregue em
+**Run**. O script põe a ponte em `/home/fpp/`, faz com que arranque sozinha com o Pi e mostra o endereço da página de
+controlo. Para atualizar a ponte, faça o mesmo com o `instalar_ponte.sh` novo.
+
+**À mão:**
+
 Corre em qualquer computador da rede de casa com Python 3. Pode ser o Raspberry Pi do FPP: é um programa
 separado, na porta 8099, e não mexe no FPP. Não precisa de instalar mais nada.
 
