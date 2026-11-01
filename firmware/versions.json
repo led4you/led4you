@@ -1,3 +1,3 @@
-[{ "version": 99, "manifest": "manifest-v99.json", "notes": "ESP32-C3: up to 4 GIFs at the same time while there is memory (was 2); with 3-4 outputs about 3 KB more free memory" },
- { "version": 98, "manifest": "manifest-v98.json", "notes": "Zones are put back after a restart also when a preset is applied at start-up; the app shows whether the saved zones were put back" },
- { "version": 97, "manifest": "manifest-v97.json", "notes": "ESP32-C3: 3 or 4 LED outputs all sent together over SPI (no more frozen LEDs with Bluetooth); zones kept after a restart. (v96 was too big for the ESP32-C3 and could not be installed.)" }]
+[{ "version": 100, "manifest": "manifest-v100.json", "notes": "Zones are no longer lost when the lights are updated (the update cleared them and the empty layout was saved)" },
+ { "version": 99, "manifest": "manifest-v99.json", "notes": "ESP32-C3: up to 4 GIFs at the same time while there is memory (was 2); with 3-4 outputs about 3 KB more free memory" },
+ { "version": 98, "manifest": "manifest-v98.json", "notes": "Zones are put back after a restart also when a preset is applied at start-up; the app shows whether the saved zones were put back" }]
