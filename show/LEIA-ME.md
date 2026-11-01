@@ -1,4 +1,4 @@
-# Cubo das crianças (LED4YOU) — v8
+# Cubo das crianças (LED4YOU) — v9
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
@@ -61,6 +61,8 @@ Cada zona é uma matriz com o seu tamanho.
   "Todos os lados" só aparece quando os lados têm todos o mesmo tamanho.
 - **Tema**: só conta para quem abre a página sem tema no endereço. Os QR do Halloween e do Natal já trazem o tema.
 - **Tempo** de cada mensagem, imagem, efeito e desenho.
+- **Espera entre pedidos do mesmo telemóvel**: 0 de origem (sem espera).
+- **Deixar o último pedido nas luzes até chegar outro**: dá tempo para tirar fotografias.
 - **Deixar escrever texto livre**: ligado de origem. Se o desligar, só se podem enviar as mensagens prontas.
 - **Aprovar cada pedido**: os pedidos ficam em "Por aprovar", com os botões Mostrar / Recusar.
 - **Códigos QR**: dois, um para cada tema, com o botão Copiar endereço. **Não mudam**: pode mudar lados ou tempos
@@ -94,8 +96,8 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
 
 - **Palavrões**: o texto livre passa por um filtro (português e inglês, também com números). Nenhum filtro é
   perfeito: se aparecer algo que não quer, ligue a aprovação ou desligue o texto livre.
-- **Um pedido por minuto** em cada telemóvel e, na ponte, **no máximo 6 pedidos por minuto** no total (pedidos
-  repetidos são ignorados); no máximo 20 pedidos em fila ou por aprovar.
+- **Espera em cada telemóvel** conforme a página de controlo (0 de origem) e, na ponte, **no máximo 20 pedidos por
+  minuto** no total (o mesmo pedido repetido em 10 s é ignorado); no máximo 20 pedidos em fila ou por aprovar.
 - O canal do ntfy.sh é público: quem souber o código pode enviar pedidos. A ponte só aceita pedidos válidos
   (mensagens prontas, imagens do pack, desenhos do tamanho certo). Para mudar o código, mude `topic` em
   `show_config.json` e reimprima o QR.

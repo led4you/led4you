@@ -32,7 +32,7 @@ PAGE = "https://led4you.github.io/led4you/show/"
 GIF_SITE = "https://led4you.github.io/led4you/gifs/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "show_config.json")
 QUEUE_MAX = 20
-RATE_MAX = 6          # no máximo 6 pedidos aceites por minuto, venham de onde vierem (o limite da página é só no telemóvel)
+RATE_MAX = 20         # no máximo 20 pedidos aceites por minuto, venham de onde vierem (a espera na página é só no telemóvel)
 FACE_MAX = 128        # tamanho máximo de um lado (igual na página dos visitantes)
 
 PAL = ["000000", "ffffff", "ff2a2a", "ff7a1a", "ffd23f", "39d353", "2bb7ff", "9b5cff", "ff4fd8"]   # igual à página
@@ -44,7 +44,9 @@ GIF_OK = re.compile(r"^(hw|xm|ev)-[a-z0-9]{2,20}\.gif$")
 S = {   # definições (guardadas em show_config.json)
     "on": False, "topic": "l4yshow-3352b4beefd1", "board": "", "boardName": "",
     "faces": [],          # lados (zonas) onde aparecem os pedidos: [{"zone": id, "n": nome, "w": largura, "h": altura}]
-    "seconds": {"text": 20, "gif": 12, "draw": 15, "fx": 15}, "theme": "hw", "approve": False,
+    "seconds": {"text": 20, "gif": 12, "draw": 15, "fx": 30}, "theme": "hw", "approve": False,
+    "wait": 0,            # segundos entre dois pedidos do mesmo telemóvel (0 = sem espera)
+    "hold": False,        # True = o último pedido fica nas luzes até chegar outro (dá tempo para fotografias)
     "free": True,         # True = escrever texto livre (com filtro de palavrões); False = só as mensagens prontas
 }
 # mensagens prontas (iguais às da página dos visitantes)
@@ -94,11 +96,13 @@ def log(*a):
 
 
 def load():
+    sec = dict(S["seconds"])
     try:
         with open(CFG_FILE) as f:
             S.update(json.load(f))
     except Exception:
         pass
+    S["seconds"] = dict(sec, **S["seconds"])   # tempos novos (por exemplo o do efeito) num ficheiro antigo
     if not S["topic"]:
         S["topic"] = "l4yshow-" + secrets.token_hex(6)   # código do show, criado uma vez
         save()
@@ -233,7 +237,7 @@ def add(msg):
     with lock:
         while recent and now - recent[0][0] > 60:
             recent.popleft()
-        if any(m == msg for _, m in recent):
+        if any(m == msg and now - t < 10 for t, m in recent):   # o mesmo pedido duas vezes em 10 s (toque duplo)
             log("pedido repetido ignorado")
             return
         if len(recent) >= RATE_MAX:
@@ -266,7 +270,7 @@ def show_loop():
         try:
             kind, cmd, info = jobs.get(timeout=1)
         except queue.Empty:
-            if saved is not None:
+            if saved is not None and not S["hold"]:
                 ip, st = saved
                 try:
                     for s in st.get("seg", []):
@@ -307,7 +311,7 @@ def publish_status():
     """a página dos visitantes lê isto para saber se a opção está ligada"""
     try:
         body = json.dumps({"on": bool(S["on"] and S["board"] and S["faces"]), "faces": [{"n": f.get("n", ""), "w": f["w"], "h": f["h"]} for f in S["faces"]],
-                           "theme": S["theme"], "free": S["free"], "at": int(time.time())}).encode()
+                           "theme": S["theme"], "free": S["free"], "wait": S["wait"], "at": int(time.time())}).encode()
         urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-estado", data=body, headers={"Cache": "yes"}), timeout=10).read()
     except Exception as e:
         log("não consegui avisar a página do estado:", e)
@@ -424,8 +428,12 @@ pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:2
     <div><label for="sText">Texto (s)</label><input type="number" id="sText" min="3" max="120"></div>
     <div><label for="sGif">Imagem (s)</label><input type="number" id="sGif" min="3" max="120"></div>
     <div><label for="sDraw">Desenho (s)</label><input type="number" id="sDraw" min="3" max="120"></div>
-    <div><label for="sFx">Efeito (s)</label><input type="number" id="sFx" min="3" max="120"></div>
+    <div><label for="sFx">Efeito (s)</label><input type="number" id="sFx" min="3" max="300"></div>
   </div>
+  <label for="wait">Espera entre pedidos do mesmo telemóvel (segundos, 0 = sem espera)</label>
+  <input type="number" id="wait" min="0" max="600">
+  <label class="big" style="font-size:16px"><input type="checkbox" id="hold"> Deixar o último pedido nas luzes até chegar outro</label>
+  <div class="note">Dá tempo para tirar fotografias. Desligado: depois do tempo, as luzes voltam ao que mostravam antes.</div>
   <label class="big" style="font-size:16px"><input type="checkbox" id="free"> Deixar escrever texto livre</label>
   <div class="note">Desligado (recomendado para crianças): só as mensagens prontas, as imagens e os desenhos.</div>
   <label class="big" style="font-size:16px"><input type="checkbox" id="approve"> Aprovar cada pedido antes de aparecer</label>
@@ -459,7 +467,7 @@ function render(){
  if(!editing){opt($('board'),[['','Escolha uma placa']].concat(st.boards.map(b=>[b.ip,b.name+' ('+b.ip+')'])).concat(st.board&&!st.boards.some(b=>b.ip===st.board)?[[st.board,(st.boardName||st.board)+' ('+st.board+')']]:[]),st.board);
   if(zonesFor!==st.board){zonesFor=st.board;loadZones(st.board,st.faces);}
   $('free').checked=st.free;
-  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||15;$('approve').checked=st.approve;}
+  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||30;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('approve').checked=st.approve;}
  const qk=st.urls.hw+st.urls.xm;$('url_hw').textContent=st.urls.hw;$('url_xm').textContent=st.urls.xm;
  if(qrFor!==qk&&window.QRCode){for(const t of ['hw','xm']){$('qr_'+t).replaceChildren();new QRCode($('qr_'+t),{text:st.urls[t],width:200,height:200,correctLevel:QRCode.CorrectLevel.M});}qrFor=qk;}
  $('pendCard').hidden=!st.pending.length;
@@ -473,11 +481,11 @@ function render(){
 async function refresh(){st=await api('state');render();}
 $('on').onchange=()=>api('settings',{on:$('on').checked}).then(refresh);
 $('board').onfocus=()=>editing=true;
-$('board').onchange=()=>{editing=true;loadZones($('board').value,[]);};$('free').onchange=()=>editing=true;
+$('board').onchange=()=>{editing=true;loadZones($('board').value,[]);};$('free').onchange=()=>editing=true;$('hold').onchange=()=>editing=true;$('wait').oninput=()=>editing=true;
 $('scan').onclick=async()=>{$('scanMsg').textContent='A procurar… (até 10 s)';const r=await api('scan',{});$('scanMsg').textContent=r.length+' placa(s) encontrada(s)';editing=false;await refresh();};
 $('save').onclick=async()=>{const b=st.boards.find(x=>x.ip===$('board').value);const faces=facesNow();
  if(!faces.length){$('saveMsg').textContent='Marque pelo menos um lado.';return;}
- await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value}});
+ await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,hold:$('hold').checked,wait:Math.max(0,Math.min(600,+$('wait').value|0)),seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value}});
  editing=false;$('saveMsg').textContent='Guardado.';setTimeout(()=>$('saveMsg').textContent='',2500);refresh();};
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(st.urls[b.dataset.copy]).then(()=>{b.textContent='Copiado';setTimeout(()=>b.textContent='Copiar endereço',2000);}));
 $('test').onclick=()=>api('test',{t:$('testTxt').value||'Ola!'}).then(refresh);
@@ -532,7 +540,7 @@ class Admin(BaseHTTPRequestHandler):
         if p == "/api/settings":
             changed_on = "on" in b and bool(b["on"]) != S["on"]
             with lock:
-                for k in ("on", "approve", "free"):
+                for k in ("on", "approve", "free", "hold"):
                     if k in b:
                         S[k] = bool(b[k])
                 if "board" in b and (b["board"] == "" or re.fullmatch(r"[0-9.]{7,15}", str(b["board"]))):
@@ -545,10 +553,12 @@ class Admin(BaseHTTPRequestHandler):
                     S["faces"] = fs
                 if b.get("theme") in ("hw", "xm", "ev", ""):
                     S["theme"] = b["theme"]
+                if isinstance(b.get("wait"), int) and 0 <= b["wait"] <= 600:
+                    S["wait"] = b["wait"]
                 if isinstance(b.get("seconds"), dict):
                     for k in ("text", "gif", "draw", "fx"):
                         v = b["seconds"].get(k)
-                        if isinstance(v, int) and 3 <= v <= 120:
+                        if isinstance(v, int) and 3 <= v <= 300:
                             S["seconds"][k] = v
                 save()
             log("definições guardadas" + (" (ligado)" if S["on"] else " (desligado)"))
