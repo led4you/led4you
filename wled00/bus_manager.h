@@ -269,6 +269,7 @@ class BusDigital : public Bus {
     void     applyBriLimit(uint8_t newBri);
     size_t   getBusSize() const override;
     bool isI2S(); // true if this bus uses I2S driver
+    uint8_t l4yWantPin() const { return _l4yWantPin; }   // LED4YOU
     void begin() override;
     void cleanup();
 
@@ -278,6 +279,7 @@ class BusDigital : public Bus {
     uint8_t  _skip;
     uint8_t  _colorOrder;
     uint8_t  _pins[2];
+    uint8_t  _l4yWantPin = 255;   // LED4YOU: pin from the settings, also when it could not be taken (shown in the app)
     uint8_t  _iType;
     uint8_t  _driverType; // 0=RMT (default), 1=I2S
     uint16_t _frequencykHz;

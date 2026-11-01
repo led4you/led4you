@@ -407,6 +407,17 @@ class Led4youBle : public Usermod {
         if (led.isNull()) led = d.createNestedObject(F("hw")).createNestedObject(F("led"));
         for (JsonPair kv : nled) led[String(kv.key().c_str())] = kv.value();   // String key: copied into this document   // ins, total, maxpwr, matrix... replace the old ones
         if (noMatrix) led.remove(F("matrix"));
+        // the pins chosen for the LEDs win: a button or the movement sensor on one of them is taken off it
+        // (WLED's default button is on GPIO 0, which then stopped an LED output on GPIO 0 from starting)
+        uint64_t ledPins = 0;
+        for (JsonObject o : led[F("ins")].as<JsonArray>()) { const int p = o[F("pin")][0] | -1; if (p >= 0 && p < 64) ledPins |= 1ULL << p; }
+        for (JsonObject bt : d[F("hw")][F("btn")][F("ins")].as<JsonArray>()) {
+          JsonArray bpin = bt[F("pin")];
+          const int p = bpin[0] | -1;
+          if (p >= 0 && p < 64 && (ledPins >> p & 1)) { bpin[0] = -1; bt[F("type")] = 0; }
+        }
+        JsonObject exr = d[F("um")][F("LED4YOU Extras")];
+        if (!exr.isNull()) { const int p = exr[F("pir-pin")] | -1; if (p >= 0 && p < 64 && (ledPins >> p & 1)) exr[F("pir-pin")] = -1; }
       }
       if (!nlight.isNull() && nlight[F("aseg")].is<bool>()) {
         JsonObject li = d[F("light")];
@@ -661,9 +672,13 @@ class Led4youBle : public Usermod {
         Bus* bb = BusManager::getBus(i);
         if (!bb || !bb->isDigital()) continue;
         uint8_t bp[5] = {255,255,255,255,255}; bb->getPins(bp);
+        // an output that could not start: the pin it asked for, and what has that pin (button, sensor, microphone...)
+        const bool ok = bb->isOk();
+        if (!ok && !bb->isPlaceholder()) bp[0] = static_cast<BusDigital*>(bb)->l4yWantPin();
+        const unsigned owner = (!ok && bp[0] != 255) ? (unsigned)PinManager::getPinOwner(bp[0]) : 0;
         if (oj.length() > 1) oj += ',';
-        char ob[48];
-        snprintf_P(ob, sizeof(ob), PSTR("[%d,%u,%u,%u,%u]"), bp[0] == 255 ? -1 : bp[0], bb->getLength(), bb->getType() & 0x7F, bb->getColorOrder() & 0x0F, bb->getStart());
+        char ob[64];
+        snprintf_P(ob, sizeof(ob), PSTR("[%d,%u,%u,%u,%u,%u,%u]"), bp[0] == 255 ? -1 : bp[0], bb->getLength(), bb->getType() & 0x7F, bb->getColorOrder() & 0x0F, bb->getStart(), ok ? 1u : 0u, owner);
         oj += ob;
       }
       oj += ']';

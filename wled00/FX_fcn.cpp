@@ -1289,7 +1289,12 @@ void WS2812FX::finalizeInit() {
   _length = 0;
   for (size_t i=0; i<BusManager::getNumBusses(); i++) {
     Bus *bus = BusManager::getBus(i);
+#ifdef LED4YOU_BLE
+    if (!bus || bus->getStart() + bus->getLength() > MAX_LEDS) break;
+    if (!bus->isOk()) continue;   // LED4YOU: one output that did not start (pin taken) no longer stops the ones after it
+#else
     if (!bus || !bus->isOk() || bus->getStart() + bus->getLength() > MAX_LEDS) break;
+#endif
     //RGBW mode is enabled if at least one of the strips is RGBW
     _hasWhiteChannel |= bus->hasWhite();
     //refresh is required to remain off if at least one of the strips requires the refresh.

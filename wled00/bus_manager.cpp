@@ -139,6 +139,7 @@ BusDigital::BusDigital(const BusConfig &bc)
   _iType = bc.iType; // reuse the iType that was determined by polyBus in getI() in finalizeInit()
   if (_iType == I_NONE) { DEBUGBUS_PRINTLN(F("Incorrect iType!")); return; }
 
+  _l4yWantPin = bc.pins[0];   // LED4YOU: so the app can say which pin is taken by something else
   if (!PinManager::allocatePin(bc.pins[0], true, PinOwner::BusDigital)) { DEBUGBUS_PRINTLN(F("Pin 0 allocated!")); return; }
   _frequencykHz = 0U;
   _colorSum = 0;
