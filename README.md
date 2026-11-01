@@ -3,7 +3,7 @@
 **LED4YOU** são luzes de Halloween e Natal com LEDs WS2812B, controladas a partir do telemóvel por **Bluetooth** ou **Wi‑Fi**.
 O firmware é uma versão própria do [WLED](https://github.com/wled/WLED) 16.0.1, com uma app e funções feitas para decorações de época.
 
-👉 **App:** https://coristinaa.github.io/led4you/ (abre no Chrome ou no Edge e pode ser instalada como app)
+👉 **App:** https://led4you.github.io/led4you/ (abre no Chrome ou no Edge e pode ser instalada como app)
 
 ---
 
@@ -36,7 +36,7 @@ Nunca uses o ficheiro de um chip no outro.
 
 ## Instalar numa placa nova
 
-**Mais fácil:** abre a [app](https://coristinaa.github.io/led4you/) no **Chrome ou Edge de um computador**, liga a placa por USB e usa o cartão
+**Mais fácil:** abre a [app](https://led4you.github.io/led4you/) no **Chrome ou Edge de um computador**, liga a placa por USB e usa o cartão
 **Instalar o LED4YOU numa placa nova**: escolhes a versão e o ficheiro certo para o chip (ESP32‑C3 ou ESP32) é gravado sozinho.
 
 **À mão:**
@@ -45,7 +45,7 @@ Nunca uses o ficheiro de um chip no outro.
 2. Liga a placa por USB e carrega em **Connect** (se não ligar, segura o botão **BOOT** ao ligar o cabo).
 3. Carrega em **Erase Flash**.
 4. Em **Flash Address** escreve `0x0`, escolhe o ficheiro **`…_completo.bin`** do teu chip e carrega em **Program**.
-5. Abre a [app](https://coristinaa.github.io/led4you/), liga-te por Bluetooth à placa **LED4YOU‑xxxx** e configura o Wi‑Fi e o pino dos LEDs.
+5. Abre a [app](https://led4you.github.io/led4you/), liga-te por Bluetooth à placa **LED4YOU‑xxxx** e configura o Wi‑Fi e o pino dos LEDs.
 
 ## Atualizar
 
@@ -63,14 +63,14 @@ A versão mais recente está sempre em [`firmware/latest.json`](firmware/latest.
 | `gifs/` | Pacote de GIFs originais |
 | `fonts/` | Letras com emojis e acentos para o texto |
 | `firmware/` | Ficheiros para gravar e atualizar as placas |
-| branch [`firmware`](https://github.com/coristinaa/led4you/tree/firmware) | Código-fonte do firmware (WLED 16.0.1 + usermods LED4YOU) |
+| branch [`firmware`](https://github.com/led4you/led4you/tree/firmware) | Código-fonte do firmware (WLED 16.0.1 + usermods LED4YOU) |
 
 ---
 
 ## English
 
 LED4YOU is a WLED 16.0.1 based firmware and web app for Halloween and Christmas LED decorations (WS2812B), controlled over
-Bluetooth or Wi‑Fi. It runs on ESP32‑C3 and classic ESP32 boards (4 MB). Open the app at https://coristinaa.github.io/led4you/,
+Bluetooth or Wi‑Fi. It runs on ESP32‑C3 and classic ESP32 boards (4 MB). Open the app at https://led4you.github.io/led4you/,
 flash a new board with the `…_completo.bin` file at address `0x0`, and update later from the board's own page.
 
 ## Licença

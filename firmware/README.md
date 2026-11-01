@@ -22,4 +22,4 @@ while Bluetooth is on. For two or more outputs use the classic ESP32.
 The ESP32 version uses a different partition layout (1.6 MB program, 700 KB files), so a board that ran
 another firmware needs the full image (with erase) the first time. Never put one chip's file on the other chip.
 
-Source code: branch [`firmware`](https://github.com/coristinaa/led4you/tree/firmware) (based on WLED 16.0.1, EUPL-1.2).
+Source code: branch [`firmware`](https://github.com/led4you/led4you/tree/firmware) (based on WLED 16.0.1, EUPL-1.2).

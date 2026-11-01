@@ -19,8 +19,8 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PORT = 8099
 RELAY = "https://ntfy.sh/"
-PAGE = "https://coristinaa.github.io/led4you/show/"
-GIF_SITE = "https://coristinaa.github.io/led4you/gifs/"
+PAGE = "https://led4you.github.io/led4you/show/"
+GIF_SITE = "https://led4you.github.io/led4you/gifs/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "show_config.json")
 QUEUE_MAX = 20
 RATE_MAX = 6          # no máximo 6 pedidos aceites por minuto, venham de onde vierem (o limite da página é só no telemóvel)

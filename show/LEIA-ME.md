@@ -66,8 +66,8 @@ Carregue em **Guardar** depois de mudar. As escolhas ficam em `show_config.json`
 
 | Tema | Endereço | Página |
 |---|---|---|
-| Halloween | `https://coristinaa.github.io/led4you/show/?t=l4yshow-3352b4beefd1&tema=hw` | roxo e laranja, mensagens e imagens de Halloween |
-| Natal | `https://coristinaa.github.io/led4you/show/?t=l4yshow-3352b4beefd1&tema=xm` | verde e vermelho, mensagens e imagens de Natal |
+| Halloween | `https://led4you.github.io/led4you/show/?t=l4yshow-3352b4beefd1&tema=hw` | roxo e laranja, mensagens e imagens de Halloween |
+| Natal | `https://led4you.github.io/led4you/show/?t=l4yshow-3352b4beefd1&tema=xm` | verde e vermelho, mensagens e imagens de Natal |
 
 Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Natal.
 
