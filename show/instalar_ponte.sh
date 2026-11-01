@@ -481,6 +481,7 @@ function render(){
 async function refresh(){st=await api('state');render();}
 $('on').onchange=()=>api('settings',{on:$('on').checked}).then(refresh);
 $('board').onfocus=()=>editing=true;
+['sText','sGif','sDraw','sFx','wait','theme','approve','free','hold'].forEach(id=>{const e=$(id);e.addEventListener('focus',()=>editing=true);e.addEventListener('input',()=>editing=true);e.addEventListener('change',()=>editing=true);});   // v9: the 3 s refresh no longer puts back the old times while typing
 $('board').onchange=()=>{editing=true;loadZones($('board').value,[]);};$('free').onchange=()=>editing=true;$('hold').onchange=()=>editing=true;$('wait').oninput=()=>editing=true;
 $('scan').onclick=async()=>{$('scanMsg').textContent='A procurar… (até 10 s)';const r=await api('scan',{});$('scanMsg').textContent=r.length+' placa(s) encontrada(s)';editing=false;await refresh();};
 $('save').onclick=async()=>{const b=st.boards.find(x=>x.ip===$('board').value);const faces=facesNow();
