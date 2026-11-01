@@ -13,7 +13,7 @@
 #include "wled.h"
 #include <WiFiUdp.h>
 
-#define L4Y_FW_VERSION 97      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
+#define L4Y_FW_VERSION 98      // LED4YOU firmware version, compared with firmware/latest.json on the LED4YOU site
 #define L4Y_HOUSE_PORT 21329   // UDP port for house scenes ("L4YS" packets)
 extern const int l4yFwVersion = L4Y_FW_VERSION;   // shown by Improv (installer, Wi-Fi setup) as "v.."
 
@@ -123,6 +123,8 @@ static void mode_retrotree(void) {
 }
 static const char _data_FX_L4Y_RETROTREE[] PROGMEM = "Retro Tree@Glow speed,Glow depth;;;01;sx=96,ix=128";
 
+int8_t l4yZoneBoot = -1;     // zones at start-up (shown in the app): -1 not yet, 0 none saved, 1 put back,
+                             // 2 not put back (LED setup changed since), 3 only one zone saved, 4 file unreadable
 #ifdef WLED_ENABLE_DMX_INPUT
 bool l4yDmxInOn = true;      // read by wled.cpp: DMX input starts at boot only when on (pins are in Sync Interfaces)
 #endif
@@ -404,12 +406,16 @@ class Led4youExtras : public Usermod {
     }
     // false only when the JSON buffer was busy: try again a moment later (the zones were lost when the app was
     // reading over Bluetooth right at start-up, and the next change then wrote the default zones over the saved ones)
+    // v98: also with a preset at start-up (it was the reason zones were gone after a restart): the preset sets the
+    // effects, then the zones get their saved places back (each zone keeps the effect it has)
     bool restoreZones() {
-      if (bootPreset > 0 || !WLED_FS.exists(F("/l4yzones.json"))) return true;
+      if (!WLED_FS.exists(F("/l4yzones.json"))) { l4yZoneBoot = 0; return true; }
       if (!requestJSONBufferLock(JSON_LOCK_REMOTE)) return false;
       File f = WLED_FS.open(F("/l4yzones.json"), "r");
       bool ok = f && !deserializeJson(*pDoc, f);
       if (f) f.close();
+      if (ok) l4yZoneBoot = (*pDoc)["b"].as<uint32_t>() != busSig() ? 2 : (*pDoc)["z"].size() > 1 ? 1 : 3;
+      else l4yZoneBoot = 4;
       if (ok && (*pDoc)["b"].as<uint32_t>() == busSig() && (*pDoc)["z"].size() > 1) {
         // turn the saved list into a normal "seg" command (zones that are there now but not in the file are removed)
         JsonArray saved = (*pDoc)["z"];
@@ -445,7 +451,7 @@ class Led4youExtras : public Usermod {
       if ((int32_t)(now - zonesCheckAt) < 0) return;
       zonesCheckAt = now + 2000;
       if (!zonesRestored) {
-        if (now < 3000 || strip.isUpdating()) return;   // let the LED outputs and the boot finish first
+        if (now < (bootPreset > 0 ? 6000u : 3000u) || strip.isUpdating()) return;   // let the boot (and its preset) finish first
         if (!restoreZones() && now < 60000) { zonesCheckAt = now + 300; return; }   // JSON buffer busy: again soon
         zonesRestored = true;
         zonesSavedSig = zonesSig = zoneSig();

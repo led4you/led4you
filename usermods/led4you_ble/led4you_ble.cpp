@@ -638,7 +638,7 @@ class Led4youBle : public Usermod {
         d[F("ws")] = (int)WiFi.status(); d[F("wr")] = l4yWifiReason; d[F("wf")] = l4yWifiFails;
         d[F("wm")] = (int)WiFi.getMode(); d[F("ap")] = apActive; d[F("ss")] = multiWiFi.size() ? multiWiFi[0].clientSSID : "";
         d[F("ch")] = WiFi.channel(); d[F("tx")] = (int)WiFi.getTxPower();
-        d[F("cw")] = configNeedsWrite; d[F("ib")] = doInitBusses; d[F("rs")] = rebootAfterSave; d[F("jl")] = jsonBufferLock;
+        { extern int8_t l4yZoneBoot; d[F("zb")] = l4yZoneBoot; } d[F("cw")] = configNeedsWrite; d[F("ib")] = doInitBusses; d[F("rs")] = rebootAfterSave; d[F("jl")] = jsonBufferLock;
         Bus* b0 = BusManager::getBus(0); uint8_t pp[5] = {255,255,255,255,255}; if (b0) b0->getPins(pp);
         d[F("bp")] = pp[0] == 255 ? -1 : pp[0]; d[F("nb")] = BusManager::getNumBusses(); d[F("rr")] = (int)esp_reset_reason(); d[F("hf")] = (ESP.getFreeHeap() >> 12) << 2; d[F("hb")] = (heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) >> 12) << 2;   // KB, in 4 KB steps
         serializeJson(d, dg);
