@@ -1896,6 +1896,7 @@
 	}
 
 	window.L4YStudio = {
+		pv: PV,   // effect previews (also used by the kids' cube page, show/)
 		textCard,
 		helpify,
 		autoHelp,

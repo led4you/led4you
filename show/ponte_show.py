@@ -62,6 +62,9 @@ FX_NAMES = {k: n for v in FX_LIST.values() for k, n in v}
 fx_cache = {}         # placa -> (hora, lista dos nomes dos efeitos): o número de cada efeito vem da própria placa
 
 
+d2 = set()            # efeitos de matriz (2D) da placa
+
+
 FX_SKIP = {"RSVD", "Image", "Scrolling Text", "My LEDs", "Solid", "Blink", "Blink Rainbow", "Strobe", "Strobe Rainbow",
            "Strobe Mega", "Multi Strobe", "Lightning"}   # não fazem sentido como pedido (ou piscam demasiado para crianças)
 
@@ -88,6 +91,7 @@ def board_fx(ip):
     """os efeitos da placa que os visitantes podem escolher: sem os de som (precisam de microfone) e sem os da lista FX_SKIP"""
     names, data = fx_names(ip)
     out = []
+    d2.clear()
     for i, n in enumerate(names):
         if not n or n in FX_SKIP or n.startswith("-") or n in out:
             continue
@@ -96,6 +100,8 @@ def board_fx(ip):
         if "v" in flags or "f" in flags:
             continue
         out.append(n)
+        if "2" in flags and "1" not in flags:
+            d2.add(n)   # efeito só de matriz (para a pré-visualização na página)
     return sorted(out, key=str.lower)
 
 
@@ -240,7 +246,15 @@ def check(msg, allow_free=False):
                     return None
             except Exception:
                 return None
-        return "fx", segs({"fx": 0, "fxdef": True, "frz": False}), {"e": e, "n": n, "where": where}
+        part = {"fx": 0, "fxdef": True, "frz": False}
+        # v13: a paleta (0 = a do próprio efeito) e as duas cores escolhidas pelos visitantes (das 8 cores da página)
+        pal = m.get("pal", 0)
+        if isinstance(pal, int) and 1 <= pal <= 120:
+            part["pal"] = pal
+        c = m.get("c")
+        if isinstance(c, list) and len(c) == 2 and all(isinstance(i, int) and 0 <= i < len(PAL) for i in c):
+            part["col"] = [[int(PAL[i][j:j + 2], 16) for j in (0, 2, 4)] for i in c] + [[0, 0, 0]]
+        return "fx", segs(part), {"e": e, "n": n, "where": where}
     if k == "draw":
         p = str(m.get("p", ""))
         w, h = m.get("w"), m.get("h")
@@ -404,11 +418,12 @@ def publish_fx():
         log("não consegui ler os efeitos da placa:", e)
         return
     try:
-        body = json.dumps({"fx": names, "at": int(time.time())}, ensure_ascii=False, separators=(",", ":")).encode()
-        if len(body) > 4000:   # mensagens maiores viram anexo no ntfy: corta a lista
-            while len(body) > 4000 and names:
-                names = names[:-5]
-                body = json.dumps({"fx": names, "at": int(time.time())}, ensure_ascii=False, separators=(",", ":")).encode()
+        mk = lambda ns: json.dumps({"fx": ns, "d2": [i for i, n in enumerate(ns) if n in d2], "at": int(time.time())},
+                                   ensure_ascii=False, separators=(",", ":")).encode()
+        body = mk(names)
+        while len(body) > 4000 and names:   # mensagens maiores viram anexo no ntfy: corta a lista
+            names = names[:-5]
+            body = mk(names)
         urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-fx", data=body, headers={"Cache": "yes"}), timeout=10).read()
         log("lista de %d efeitos enviada para a página dos visitantes" % len(names))
     except Exception as e:

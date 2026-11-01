@@ -26,6 +26,11 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 .chip { min-height: 48px; padding: 8px 16px; border-radius: 999px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; }
 .chip[aria-pressed="true"] { border-color: var(--hot); }
 .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.pvbig { display: block; width: 100%; max-width: 300px; margin: 0 auto 4px; border-radius: 14px; background: #05060a; }
+.pals { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; max-height: 260px; overflow-y: auto; padding: 2px; }
+.pal { display: flex; flex-direction: column; gap: 5px; padding: 7px 9px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.pal[aria-pressed="true"], .pal:focus-visible { border-color: var(--accent, #ff3d3d); }
+.pal i { display: block; height: 12px; border-radius: 6px; }
 .sw { width: 48px; height: 48px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
 .sw[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 3px var(--bg) inset; }
 .sw.erase { background: repeating-linear-gradient(45deg, #000 0 6px, #444 6px 12px); }
@@ -85,6 +90,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   </section>
 
   <section class="card" id="pFx" hidden>
+    <div id="fxPv"></div>
+    <div class="note" style="text-align:center">Assim fica (mais ou menos) nas luzes</div>
     <div class="lab">Escolhe um efeito</div>
     <div class="chips" id="fxs"></div>
     <div id="fxAllBox" hidden>
@@ -92,6 +99,12 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
       <input type="search" id="fxFind" placeholder="Procurar um efeito" autocomplete="off">
       <div class="chips" id="fxAll"></div>
     </div>
+    <div class="lab">Cor principal</div>
+    <div class="swatches" id="fxC1"></div>
+    <div class="lab">Segunda cor</div>
+    <div class="swatches" id="fxC2"></div>
+    <div class="lab">Paleta de cores</div>
+    <div class="pals" id="pals"></div>
   </section>
 
   <section class="card" id="pDraw" hidden>
@@ -105,6 +118,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="msg" id="msg" role="status"></p>
   <p class="note" id="waitNote" hidden></p>
 </main>
+<script src="pal.js?v=13"></script>
+<script src="../studio.js?v=13"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -177,13 +192,57 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	$('txt').oninput = () => { if ($('txt').value.trim()) { quick = null; $('quick').querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', 'false')); } updPrev(); };
 
 	// ---- effects (the same keys as FX_LIST in ponte_show.py) ----
+	// [key, label, effect name on the lights, matrix-only effect]
 	const FXS = {
-		hw: [['haunted', '👻 Casa assombrada'], ['eyes', '👀 Olhos no escuro'], ['fire', '🔥 Fogo'], ['lightning', '⚡ Relâmpagos'], ['firenoise', '🔥 Chamas mágicas'], ['blackhole', '🌀 Buraco negro']],
-		xm: [['snowfall', '❄️ Neve a cair'], ['candy', '🍬 Bengala doce'], ['retro', '🎄 Árvore de Natal'], ['twinkle', '✨ Estrelas a piscar'], ['fireworks', '🎆 Fogo de artifício'], ['bursts', '💥 Explosões de cor']],
-		ev: [['rainbow', '🌈 Arco-íris'], ['fireworks', '🎆 Fogo de artifício'], ['plasma', '🔮 Bola de plasma'], ['ripple', '💧 Ondas'], ['matrix', '💚 Chuva de letras'], ['pacifica', '🌊 Mar']]
+		hw: [['haunted', '👻 Casa assombrada', 'Haunted'], ['eyes', '👀 Olhos no escuro', 'Halloween Eyes'], ['fire', '🔥 Fogo', 'Fire 2012'], ['lightning', '⚡ Relâmpagos', 'Lightning'], ['firenoise', '🔥 Chamas mágicas', 'Firenoise', 1], ['blackhole', '🌀 Buraco negro', 'Black Hole', 1]],
+		xm: [['snowfall', '❄️ Neve a cair', 'Snowfall'], ['candy', '🍬 Bengala doce', 'Candy Cane'], ['retro', '🎄 Árvore de Natal', 'Retro Tree'], ['twinkle', '✨ Estrelas a piscar', 'Twinklefox'], ['fireworks', '🎆 Fogo de artifício', 'Fireworks'], ['bursts', '💥 Explosões de cor', 'Colored Bursts']],
+		ev: [['rainbow', '🌈 Arco-íris', 'Rainbow'], ['fireworks', '🎆 Fogo de artifício', 'Fireworks'], ['plasma', '🔮 Bola de plasma', 'Plasma Ball', 1], ['ripple', '💧 Ondas', 'Ripple'], ['matrix', '💚 Chuva de letras', 'Matrix', 1], ['pacifica', '🌊 Mar', 'Pacifica']]
 	};
 	// fx = 'e:<key>' (a suggestion above) or 'n:<effect name>' (any effect of the lights, list sent by the bridge)
-	let fx = null, boardFx = [];
+	let fx = null, boardFx = [], boardD2 = new Set(), fxC1 = 3, fxC2 = 7, fxPal = 0;
+	// palettes: names and colour stops (pal.js, the same as the LED4YOU app); 2-5 are made from the two colours
+	const PALN = (window.L4Y_PAL || ['Default']).map((n, i) => ({ 0: 'Do efeito', 1: 'Aleatória', 2: 'Cor principal', 3: 'As duas cores', 4: 'Degradê', 5: 'Só as cores' })[i] || n.replace(/^\* /, ''));
+	const rgb = i => [0, 2, 4].map(j => parseInt(PAL[i].slice(j, j + 2), 16));
+	const palStops = id => {
+		const a = rgb(fxC1), b = rgb(fxC2);
+		if (id >= 6 && window.L4Y_PALX && L4Y_PALX[id - 6]) return L4Y_PALX[id - 6];
+		if (id === 2) return [0, ...a, 255, ...a];
+		if (id === 3) return [0, ...a, 127, ...a, 128, ...b, 255, ...b];
+		if (id === 4) return [0, ...a, 255, ...b];
+		if (id === 5) return [0, ...a, 85, ...a, 86, ...b, 170, ...b, 171, ...a, 255, ...a];
+		return null;
+	};
+	const palCss = id => {
+		if (id === 1) return 'linear-gradient(90deg,#f24,#fb2,#3d6,#29f,#a4f,#f24)';
+		const st = palStops(id); if (!st) return 'linear-gradient(90deg,#555,#999)';
+		const parts = []; for (let i = 0; i < st.length; i += 4) parts.push('rgb(' + st[i + 1] + ',' + st[i + 2] + ',' + st[i + 3] + ') ' + (st[i] / 2.55).toFixed(1) + '%');
+		return 'linear-gradient(90deg,' + parts.join(',') + ')';
+	};
+	// the preview: the chosen effect, colours and palette on a matrix the size of the chosen side
+	const PV = window.L4YStudio && L4YStudio.pv;
+	const pvCv = PV ? PV.big() : null;
+	if (pvCv) $('fxPv').append(pvCv);
+	const fxInfo = () => {
+		if (!fx) return null;
+		if (fx.startsWith('n:')) { const n = fx.slice(2); return { name: n, d2: boardD2.has(n) }; }
+		const all = [].concat(FXS.hw, FXS.xm, FXS.ev), e = all.find(x => x[0] === fx.slice(2));
+		return e ? { name: e[2], d2: !!e[3] } : null;
+	};
+	const updPv = () => {
+		const f = fxInfo(); if (!pvCv || !f) return;
+		const sz = cfg.faces[Math.max(0, face)] || cfg.faces[0] || { w: 16, h: 16 };
+		pvCv.update({ name: f.name, d2: f.d2, col: [rgb(fxC1), rgb(fxC2), [0, 0, 0]], pal: fxPal >= 2 ? palStops(fxPal) : null, speed: 128, mw: sz.w, mh: sz.h });
+	};
+	const drawPals = () => {
+		$('pals').replaceChildren(...PALN.map((n, i) => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'pal'; b.setAttribute('aria-pressed', String(i === fxPal));
+			const t = document.createElement('span'); t.textContent = n; const bar = document.createElement('i'); bar.style.background = palCss(i);
+			b.append(t, bar); b.onclick = () => { fxPal = i; drawPals(); updPv(); };
+			return b;
+		}));
+	};
+	swatches($('fxC1'), [1, 2, 3, 4, 5, 6, 7, 8], fxC1, i => { fxC1 = i; drawPals(); updPv(); });
+	swatches($('fxC2'), [1, 2, 3, 4, 5, 6, 7, 8], fxC2, i => { fxC2 = i; drawPals(); updPv(); });
 	const fxChip = (id, label) => {
 		const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = label; b.setAttribute('aria-pressed', String(id === fx));
 		b.onclick = () => { fx = id; drawFx(); };
@@ -194,6 +253,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		const list = (FXS[cfg.theme] || [].concat(FXS.hw, FXS.xm, FXS.ev)).filter(([k]) => !seen.has(k) && seen.add(k));
 		if (!fx) fx = 'e:' + list[0][0];
 		$('fxs').replaceChildren(...list.map(([k, n]) => fxChip('e:' + k, n)));
+		if (!$('pals').firstChild) drawPals();
+		updPv();
 		$('fxAllBox').hidden = !boardFx.length;
 		const f = $('fxFind').value.trim().toLowerCase();
 		$('fxAll').replaceChildren(...boardFx.filter(n => !f || n.toLowerCase().includes(f)).map(n => fxChip('n:' + n, n)));
@@ -203,6 +264,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		const last = txt.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
 		let m = null; try { m = last && JSON.parse(last.message); } catch (e) {}
 		boardFx = m && Array.isArray(m.fx) ? m.fx.filter(n => typeof n === 'string').map(n => n.slice(0, 40)).slice(0, 300) : [];
+		boardD2 = new Set(m && Array.isArray(m.d2) ? m.d2.map(i => boardFx[i]).filter(Boolean) : []);
 		drawFx();
 	}).catch(() => {});
 
@@ -292,6 +354,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		} else if (tab === 'fx') {
 			if (!fx) { say('Escolhe primeiro um efeito.', 'err'); return; }
 			body = fx.startsWith('e:') ? { k: 'fx', e: fx.slice(2) } : { k: 'fx', n: fx.slice(2) };
+			body.c = [fxC1, fxC2]; if (fxPal) body.pal = fxPal;
 		} else {
 			if (!pixels.some(v => v)) { say('Faz primeiro um desenho.', 'err'); return; }
 			body = { k: 'draw', w: gw, h: gh, p: pixels.join('') };
