@@ -152,7 +152,7 @@ fetch('/json/si').then(r => r.json()).then(readInfo).catch(() => toast('Could no
 		document.getElementById('paneMore').append(card);
 	}
 	// the pack lives with the app on GitHub Pages (sent with CORS), so it needs internet on the phone or computer
-	document.getElementById('paneGifs').append(...L4YStudio.myImagesCards(wifi, toast), L4YStudio.gifPackCard(wifi, toast, 'https://coristinaa.github.io/led4you/gifs/'));
+	document.getElementById('paneGifs').append(...L4YStudio.myImagesCards(wifi, toast), L4YStudio.gifPackCard(wifi, toast, 'https://led4you.github.io/led4you/gifs/'));
 	if (location.hash === '#gifs') show('Gifs');
 	L4YStudio.autoHelp();
 	let houseMounted = false;
@@ -173,7 +173,7 @@ fetch('/json/si').then(r => r.json()).then(readInfo).catch(() => toast('Could no
 				const j = await (await fetch('/json/palx?page=' + pg)).json(); m = j.m || 0;
 				for (const k in j.p) if (Array.isArray(j.p[k]) && Array.isArray(j.p[k][0])) stops[k] = j.p[k].flat();
 			}
-			await new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://coristinaa.github.io/led4you/layouts.js?h=' + Math.floor(Date.now() / 36e5); /* newest copy, at most an hour old */ sc.onload = ok; sc.onerror = no; document.head.append(sc); });
+			await new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://led4you.github.io/led4you/layouts.js?h=' + Math.floor(Date.now() / 36e5); /* newest copy, at most an hour old */ sc.onload = ok; sc.onerror = no; document.head.append(sc); });
 			const st = document.createElement('style'); st.textContent = L4YLayout.css; document.head.append(st);
 			L4YLayout.mount(box, { fx, pal, palStops: id => stops[id] || null, toast, send: wifi.send, zones: L4YStudio.zoneList ? () => L4YStudio.zoneList(wifi) : undefined, zoneRange: L4YStudio.zoneRange ? () => L4YStudio.zoneRange(wifi) : undefined, saveZone: L4YStudio.saveZone ? z => L4YStudio.saveZone(wifi, z) : undefined,
 				current: async () => { const s = (await (await fetch('/json/state')).json()).seg[0]; return { fx: s.fx, col: s.col, pal: s.pal, sx: s.sx }; } });

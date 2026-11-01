@@ -49,7 +49,7 @@
 	// accented letters and emoji: drawn by the LED4YOU text fonts (l4yf0..4.wbf, from the LED4YOU site), sent as Private Use Area characters
 	const TXT_ACC = 'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ';
 	const TXT_EMO = [["❤", "6cffffff7e3c1800"], ["⭐", "101038fe7c386c44"], ["🎃", "107cfeaafeaa7c00"], ["👻", "3c7edbffffffb500"], ["💀", "7eff9999ff662a3c"], ["🦇", "0099dbffff5a0800"], ["🕷", "995a3cbd7ebd4281"], ["🌙", "3860c0c0c0603800"], ["🎄", "103810387cfe1038"], ["❄", "925438fe38549200"], ["⛄", "3828387c82827c00"], ["🎁", "6c10fe92fe92fe00"], ["🔔", "10387c7c7cfe1000"], ["🌟", "925438ee38549200"], ["😀", "7c82aa82aa927c00"], ["😉", "7c82ae82aa927c00"], ["😢", "7c82aaa292aa7c00"], ["🎂", "545400feaafefe00"], ["🎉", "89522074f8f2e000"], ["🐰", "48484878b4fc7800"], ["🥚", "3078fca8fcfc7800"], ["🍀", "6cfe7cfe6c101000"], ["🎵", "3c2424246cee4400"], ["⚡", "1c3870fc18304000"], ["🔥", "1032767effe7663c"], ["🍬", "01ba7c7c7c5d8000"], ["☀", "924438ba38449200"], ["♪", "1814101070f06000"], ["✓", "0002048850200000"]];
-	const FONT_URL = 'https://coristinaa.github.io/led4you/fonts/';
+	const FONT_URL = 'https://led4you.github.io/led4you/fonts/';
 	const toLights = m => {
 		let out = '', special = false;
 		for (const ch of m.replace(/\uFE0F/g, '').replace(/♥/g, '❤')) {
@@ -1669,7 +1669,7 @@
 	}
 
 	// ---------- Firmware update (Wi-Fi only): newest version from the LED4YOU site, one tap to install ----------
-	const FW_URL = 'https://coristinaa.github.io/led4you/firmware/';
+	const FW_URL = 'https://led4you.github.io/led4you/firmware/';
 	function updateCard(toast) {
 		const title = h('div', { class: 'ct' }, 'Update available');
 		const info = h('div', { class: 'note' }, '');

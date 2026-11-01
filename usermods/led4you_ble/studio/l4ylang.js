@@ -5,7 +5,7 @@
 	var L = { en: 'English', pt: 'Português', es: 'Español', fr: 'Français' }, l = '';
 	try { l = localStorage.getItem('l4yLang') || ''; } catch (e) {}
 	if (!L[l]) { var n = (navigator.language || 'en').slice(0, 2); l = L[n] ? n : 'en'; }
-	var BASE = 'https://coristinaa.github.io/led4you/i18n/';
+	var BASE = 'https://led4you.github.io/led4you/i18n/';
 	function load() {
 		if (l === 'en' || window.L4YI18n) return;
 		var a = document.createElement('script'); a.src = BASE + 'wled_t.js';
@@ -44,7 +44,7 @@
 				it.appendChild(L4YStudio.preview({ name: nm ? nm.textContent : '', d2: opt.indexOf('2') >= 0, col: col, w: 96, h: 12 }));
 			}
 		}
-		var sc = document.createElement('script'); sc.src = 'https://coristinaa.github.io/led4you/studio.js';
+		var sc = document.createElement('script'); sc.src = 'https://led4you.github.io/led4you/studio.js';
 		sc.onload = function () { deco(); new MutationObserver(deco).observe(list, { childList: true }); };
 		document.head.appendChild(sc);
 	}
@@ -52,7 +52,7 @@
 	function checkUpdate() {
 		Promise.all([
 			fetch('/json/state', { cache: 'no-store' }).then(function (r) { return r.json(); }),
-			fetch('https://coristinaa.github.io/led4you/firmware/latest.json', { cache: 'no-store' }).then(function (r) { return r.json(); })
+			fetch('https://led4you.github.io/led4you/firmware/latest.json', { cache: 'no-store' }).then(function (r) { return r.json(); })
 		]).then(function (a) {
 			var cur = (a[0].l4y && a[0].l4y.fw) || 0, v = a[1].version || 0;
 			if (v <= cur) return;
