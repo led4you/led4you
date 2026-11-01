@@ -5,6 +5,10 @@ O firmware é uma versão própria do [WLED](https://github.com/wled/WLED) 16.0.
 
 👉 **App:** https://led4you.github.io/led4you/ (abre no Chrome ou no Edge e pode ser instalada como app)
 
+> **Endereço novo (novembro de 2026):** o site passou de `coristinaa.github.io/led4you` para `led4you.github.io/led4you`.
+> Instala a app outra vez a partir do endereço novo e atualiza cada placa **uma vez à mão** para a **v91** ou mais nova
+> (as versões antigas procuram atualizações no endereço antigo e já não as encontram).
+
 ---
 
 ## O que faz
@@ -13,17 +17,20 @@ O firmware é uma versão própria do [WLED](https://github.com/wled/WLED) 16.0.
 - **Página da placa por Wi‑Fi**: todas as funções do WLED, mais o **LED4YOU Studio**.
 - **Pré-visualização**: animações de cada efeito, paleta, tema e cena antes de os escolheres, e a imagem ao vivo das tuas luzes.
 - **Texto em matriz**: movimento para a esquerda, direita, cima e baixo, 5 tipos de letra, degradê e arco-íris, **emojis** e acentos (á, ã, ç…).
+- **Zonas**: divide as luzes em partes (por saída, por painel da matriz ou à mão), cada uma com o seu efeito, texto ou imagem; as zonas ficam guardadas na placa.
 - **Os meus LEDs**: cada LED com a sua cor e comportamento (fixo, piscar, respirar, cintilar, arco-íris), com modo de desenho.
-- **Imagens e GIFs**: pacote de GIFs de Halloween, Natal e festas, e os teus próprios GIFs.
+- **Imagens e GIFs**: pacote de 55 GIFs de Halloween, Natal e festas, os teus próprios GIFs e fotos; um GIF diferente em cada zona (até 4 no ESP32, 2 na ESP32‑C3) e "Tocar todos" por zona.
 - **Épocas**: temas prontos de Halloween e Natal e efeitos próprios (Candy Cane, Snowfall, Haunted, Retro Tree).
 - **Ver na casa**: experimenta os efeitos numa árvore, casa, jardim ou janela antes de pores as luzes.
 - **Leitura com a câmara**: a app encontra onde está cada LED (como na Twinkly) e mostra os efeitos numa foto das tuas luzes.
 - **Cenas da casa**: um toque muda todas as placas LED4YOU da casa ao mesmo tempo.
 - **Horário**: ligar e desligar a uma hora ou ao pôr e nascer do sol, temporizador, contagem decrescente e loop de presets.
-- **Som e movimento**: efeitos com microfone e sensor de movimento (PIR) para sustos de Halloween.
+- **Som e movimento**: efeitos com microfone (da placa ou do telemóvel, também a tocar músicas e listas de músicas do telemóvel) e sensor de movimento (PIR) para sustos de Halloween.
+- **Luzes DMX**: projetores DMX a reagir à música (graves, médios, agudos, batida, strobe), cada luz com a sua função.
 - **xLights**: as placas podem receber espetáculos do xLights por Wi‑Fi.
 - **4 línguas**: português, inglês, espanhol e francês.
 - **Atualização com um toque** a partir da página da placa.
+- **Cubo das crianças** ([`show/`](show/)): os visitantes leem um QR na parede e põem uma mensagem, uma imagem ou um desenho num cubo de matrizes (ver [`show/LEIA-ME.md`](show/LEIA-ME.md)).
 
 ## Placas suportadas
 
@@ -50,7 +57,7 @@ Nunca uses o ficheiro de um chip no outro.
 ## Atualizar
 
 - **Mais fácil:** na página da placa aparece um aviso quando há uma versão nova; um toque e a placa atualiza-se sozinha com o ficheiro certo para o seu chip.
-- **À mão:** na página da placa, **Config › Security & Updates › Manual upload**, com o ficheiro **`…_update.bin`** do teu chip.
+- **À mão:** na página da placa, **Config › Security & Updates › Manual upload** (ou `http://IP-DA-PLACA/update`), com o ficheiro **`…_update.bin`** do teu chip.
 
 A versão mais recente está sempre em [`firmware/latest.json`](firmware/latest.json).
 
@@ -62,6 +69,7 @@ A versão mais recente está sempre em [`firmware/latest.json`](firmware/latest.
 | `i18n/` | Traduções da app e das páginas da placa |
 | `gifs/` | Pacote de GIFs originais |
 | `fonts/` | Letras com emojis e acentos para o texto |
+| `show/` | Cubo das crianças: página dos visitantes e a ponte (`ponte_show.py`) que corre em casa |
 | `firmware/` | Ficheiros para gravar e atualizar as placas |
 | branch [`firmware`](https://github.com/led4you/led4you/tree/firmware) | Código-fonte do firmware (WLED 16.0.1 + usermods LED4YOU) |
 
