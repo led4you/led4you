@@ -1,3 +1,3 @@
-[{ "version": 89, "manifest": "manifest-v89.json", "notes": "Play all on each matrix at the same time: every zone has its own GIF rotation" },
- { "version": 88, "manifest": "manifest-v88.json", "notes": "Zones are kept after a restart again, also when memory is tight (GIFs, Bluetooth)" },
- { "version": 87, "manifest": "manifest-v87.json", "notes": "More free memory (about 16 KB, plus Bluetooth for one phone only): GIFs, text and Wi-Fi together with Bluetooth on" }]
+[{ "version": 90, "manifest": "manifest-v90.json", "notes": "Classic ESP32: up to 4 GIFs at the same time (one per side of a 4-sided cube)" },
+ { "version": 89, "manifest": "manifest-v89.json", "notes": "Play all on each matrix at the same time: every zone has its own GIF rotation" },
+ { "version": 88, "manifest": "manifest-v88.json", "notes": "Zones are kept after a restart again, also when memory is tight (GIFs, Bluetooth)" }]
