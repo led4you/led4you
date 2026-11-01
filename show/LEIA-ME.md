@@ -1,9 +1,10 @@
-# Cubo das crianças (LED4YOU) — v10
+# Cubo das crianças (LED4YOU) — v11
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
-O pedido aparece logo no lado escolhido. Cada lado é independente: enquanto um lado mostra um texto, os outros
-recebem outros pedidos. Pedidos para o mesmo lado esperam pela vez, por ordem de chegada.
+O pedido aparece logo no lado escolhido e substitui o que lá estava. Cada lado é independente: enquanto um lado
+mostra um texto, os outros recebem outros pedidos. Com a opção "Cada pedido espera que o anterior acabe", os
+pedidos para o mesmo lado esperam pela vez, por ordem de chegada.
 
 O cubo é **à parte do show**: não entra nas sequências do xLights nem no FPP. A ponte fala diretamente com a placa
 LED4YOU / WLED do cubo.
@@ -98,7 +99,7 @@ Ponha no cartaz de Halloween o QR do Halloween e no cartaz de Natal o QR do Nata
 - **Palavrões**: o texto livre passa por um filtro (português e inglês, também com números). Nenhum filtro é
   perfeito: se aparecer algo que não quer, ligue a aprovação ou desligue o texto livre.
 - **Espera em cada telemóvel** conforme a página de controlo (0 de origem) e, na ponte, **no máximo 20 pedidos por
-  minuto** no total (o mesmo pedido repetido em 10 s é ignorado); no máximo 20 pedidos em fila ou por aprovar.
+  minuto** no total (o mesmo pedido repetido em 3 s é ignorado); no máximo 20 pedidos em fila ou por aprovar.
 - O canal do ntfy.sh é público: quem souber o código pode enviar pedidos. A ponte só aceita pedidos válidos
   (mensagens prontas, imagens do pack, desenhos do tamanho certo). Para mudar o código, mude `topic` em
   `show_config.json` e reimprima o QR.
