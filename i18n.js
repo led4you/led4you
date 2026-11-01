@@ -701,6 +701,10 @@
 		['Open the Studio to update', 'Abrir o Studio para atualizar', 'Abrir el Studio para actualizar', 'Ouvrir le Studio pour mettre à jour'],
 		['Connect the lights to Wi-Fi to update them.', 'Liga as luzes ao Wi-Fi para as atualizar.', 'Conecta las luces al Wi-Fi para actualizarlas.', 'Connectez les lumières au Wi-Fi pour les mettre à jour.'],
 		// v79: effect sliders and missing app texts
+		['Test mode: more outputs and any pin', 'Modo de teste: mais saídas e qualquer pino', 'Modo de prueba: más salidas y cualquier pin', 'Mode test : plus de sorties et n’importe quelle broche'],
+		['Too many outputs for this board: remove one or turn on Test mode.', 'Saídas a mais para esta placa: remove uma ou liga o Modo de teste.', 'Demasiadas salidas para esta placa: quita una o activa el Modo de prueba.', 'Trop de sorties pour cette carte : supprimez-en une ou activez le Mode test.'],
+		['Test mode: with 3 outputs the ESP32-C3 shares its RMT between outputs 2 and 3, and they may show wrong colours while Bluetooth is connected. Test them over Wi-Fi.', 'Modo de teste: com 3 saídas a ESP32-C3 divide o RMT entre as saídas 2 e 3, que podem mostrar cores erradas com o Bluetooth ligado. Testa-as por Wi-Fi.', 'Modo de prueba: con 3 salidas la ESP32-C3 reparte su RMT entre las salidas 2 y 3, que pueden mostrar colores erróneos con el Bluetooth conectado. Pruébalas por Wi-Fi.', 'Mode test : avec 3 sorties, l’ESP32-C3 partage son RMT entre les sorties 2 et 3, qui peuvent afficher de mauvaises couleurs quand le Bluetooth est connecté. Testez-les en Wi-Fi.'],
+		['Test mode needs firmware v94 or newer on the board for more outputs.', 'O Modo de teste precisa do firmware v94 ou mais recente na placa para ter mais saídas.', 'El Modo de prueba necesita el firmware v94 o posterior en la placa para tener más salidas.', 'Le Mode test nécessite le firmware v94 ou plus récent sur la carte pour plus de sorties.'],
 		['Separate zones again', 'Separar as zonas outra vez', 'Separar las zonas otra vez', 'Séparer à nouveau les zones'],
 		['# blobs', 'Nº de manchas', 'Nº de manchas', 'Nb de taches'],
 		['# of PowerDots', 'Nº de PowerDots', 'Nº de PowerDots', 'Nb de PowerDots'],
@@ -856,6 +860,13 @@
 		[/^(\d+) channels$/, '$1 canais', '$1 canales', '$1 canaux'],
 		[/^On your Wi-Fi at (.+)$/, 'No teu Wi-Fi em $1', 'En tu Wi-Fi en $1', 'Sur votre Wi-Fi à $1'],
 		[/^Connected to (.+)$/, 'Ligado a $1', 'Conectado a $1', 'Connecté à $1'],
+		[/^Output (\d+): GPIO (\d+) is read when the board starts \(it may not start\)\.$/, 'Saída $1: o GPIO $2 é lido quando a placa arranca (pode não arrancar).', 'Salida $1: el GPIO $2 se lee al arrancar la placa (puede no arrancar).', 'Sortie $1 : le GPIO $2 est lu au démarrage de la carte (elle peut ne pas démarrer).'],
+		[/^Output (\d+): GPIO (\d+) is used by the flash memory\.$/, 'Saída $1: o GPIO $2 é usado pela memória flash.', 'Salida $1: el GPIO $2 lo usa la memoria flash.', 'Sortie $1 : le GPIO $2 est utilisé par la mémoire flash.'],
+		[/^Output (\d+): GPIO (\d+) is the USB port\.$/, 'Saída $1: o GPIO $2 é a porta USB.', 'Salida $1: el GPIO $2 es el puerto USB.', 'Sortie $1 : le GPIO $2 est le port USB.'],
+		[/^Output (\d+): GPIO (\d+) is the serial port \(RX\/TX\)\.$/, 'Saída $1: o GPIO $2 é a porta série (RX/TX).', 'Salida $1: el GPIO $2 es el puerto serie (RX/TX).', 'Sortie $1 : le GPIO $2 est le port série (RX/TX).'],
+		[/^Output (\d+): GPIO (\d+) is input only\.$/, 'Saída $1: o GPIO $2 só serve de entrada.', 'Salida $1: el GPIO $2 solo es de entrada.', 'Sortie $1 : le GPIO $2 est en entrée seulement.'],
+		[/^Output (\d+): GPIO (\d+) does not exist on the ESP32-C3\.$/, 'Saída $1: o GPIO $2 não existe na ESP32-C3.', 'Salida $1: el GPIO $2 no existe en la ESP32-C3.', 'Sortie $1 : le GPIO $2 n’existe pas sur l’ESP32-C3.'],
+		[/^Output (\d+): GPIO (\d+) does not exist on the ESP32\.$/, 'Saída $1: o GPIO $2 não existe no ESP32.', 'Salida $1: el GPIO $2 no existe en el ESP32.', 'Sortie $1 : le GPIO $2 n’existe pas sur l’ESP32.'],
 		[/^Separate zones again \((\d+)\)$/, 'Separar as zonas outra vez ($1)', 'Separar las zonas otra vez ($1)', 'Séparer à nouveau les zones ($1)']
 	];
 	if (Array.isArray(window.L4YI18N_EXTRA)) T.push(...window.L4YI18N_EXTRA);   // the board's own pages add their texts

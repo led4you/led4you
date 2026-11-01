@@ -1,3 +1,3 @@
-[{ "version": 93, "manifest": "manifest-v93.json", "notes": "Translations: effect settings, zones and many board pages now fully in Portuguese, Spanish and French" },
- { "version": 92, "manifest": "manifest-v92.json", "notes": "Settings and update pages: the help button no longer covers Back, and the top row hides while an update runs" },
- { "version": 91, "manifest": "manifest-v91.json", "notes": "New LED4YOU site address (led4you.github.io/led4you): updates, fonts and translations found again; Studio with the newest app fixes" }]
+[{ "version": 94, "manifest": "manifest-v94.json", "notes": "Test mode for LED outputs: a 3rd output on the ESP32-C3 (up to 8 on the ESP32) and a warning for risky pins" },
+ { "version": 93, "manifest": "manifest-v93.json", "notes": "Translations: effect settings, zones and many board pages now fully in Portuguese, Spanish and French" },
+ { "version": 92, "manifest": "manifest-v92.json", "notes": "Settings and update pages: the help button no longer covers Back, and the top row hides while an update runs" }]
