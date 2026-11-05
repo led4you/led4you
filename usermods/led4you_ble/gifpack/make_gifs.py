@@ -1,10 +1,10 @@
-"""LED4YOU GIF pack (55 GIFs): original 16x16 pixel-art animations for LED matrices.
+"""LED4YOU GIF pack (77 GIFs): original 16x16 pixel-art animations for LED matrices.
 Everything here is drawn from code (no external artwork). Output: gifs/*.gif + gifs/pack.json"""
-import json, math, os, random
+import colorsys, json, math, os, random
 from PIL import Image
 
 W = H = 16
-OUT = os.path.join(os.path.dirname(__file__), 'gifs')
+OUT = os.environ.get('L4Y_GIF_OUT') or os.path.join(os.path.dirname(__file__), 'gifs')
 os.makedirs(OUT, exist_ok=True)
 PACK = []
 
@@ -1317,6 +1317,516 @@ def snow_bg(f, i):
 
 
 save('xm-hohoho', 'Christmas', 'HO HO HO', scroll_text(' HO HO HO', lambda x, y, i: (230, 20, 30) if ((x + i) // 4) % 2 else (255, 255, 255), (0, 25, 8), snow_bg), 70)
+
+
+# ================= pack 3 (v3): 8 Halloween + 8 Christmas + 6 celebrations, with Portuguese text =================
+F35 = {  # 3x5 capitals for the scrolling Portuguese messages
+    'A': ["010", "101", "111", "101", "101"], 'B': ["110", "101", "110", "101", "110"], 'C': ["011", "100", "100", "100", "011"],
+    'D': ["110", "101", "101", "101", "110"], 'E': ["111", "100", "110", "100", "111"], 'F': ["111", "100", "110", "100", "100"],
+    'I': ["111", "010", "010", "010", "111"], 'L': ["100", "100", "100", "100", "111"], 'N': ["1001", "1101", "1011", "1001", "1001"],
+    'O': ["010", "101", "101", "101", "010"], 'P': ["110", "101", "110", "100", "100"], 'R': ["110", "101", "110", "101", "101"],
+    'S': ["011", "100", "010", "001", "110"], 'T': ["111", "010", "010", "010", "010"], 'U': ["101", "101", "101", "101", "111"],
+    'V': ["101", "101", "101", "101", "010"], 'Z': ["111", "001", "010", "100", "111"], '!': ["1", "1", "1", "0", "1"],
+    ' ': ["00", "00", "00", "00", "00"],
+}
+
+
+def wh(h):
+    r, g, b = colorsys.hsv_to_rgb(h % 1, 1, 1)
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
+def scroll35(s, colour_at, bg=(0, 0, 0), extra=None, y0=3, step=1):
+    """a message moving right to left, letters 2x tall (10 rows) starting at row y0"""
+    cols = []
+    for ch in s:
+        g = F35[ch]
+        for x in range(len(g[0])):
+            cols.append([g[y][x] == '1' for y in range(5)])
+        cols.append([False] * 5)
+    frames = []
+    for i in range(0, len(cols) + W, step):
+        f = blank(bg)
+        if extra:
+            extra(f, i)
+        for x in range(W):
+            cx = x + i - W
+            if 0 <= cx < len(cols):
+                for y in range(5):
+                    if cols[cx][y]:
+                        for dy in (0, 1):
+                            put(f, x, y0 + y * 2 + dy, colour_at(x, y, i))
+        frames.append(f)
+    return frames
+
+
+def rect(f, x0, y0, x1, y1, c):
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            put(f, x, y, c)
+
+
+def stars_bg(f, i, seed=1, n=10, base=(70, 70, 110)):
+    rnd = random.Random(seed)
+    for k in range(n):
+        x, y, ph = rnd.randrange(16), rnd.randrange(16), rnd.random() * 6.28
+        put(f, x, y, scale(base, 0.4 + 0.6 * (0.5 + 0.5 * math.sin(i * 0.6 + ph))))
+
+
+# ---- Halloween: jack-o'-lantern whose face glows and flickers ----
+JACK = [
+    "................",
+    ".......gg.......",
+    "......gg........",
+    "...OOOOOOOOOO...",
+    "..OOOOOOOOOOOO..",
+    ".OOOOOOOOOOOOOO.",
+    ".OOYYOOOOOOYYOO.",
+    "OOOYYYOOOOYYYOOO",
+    "OOOOOOOYYOOOOOOO",
+    "OOOOOOOYYOOOOOOO",
+    "OOYOOOOOOOOOOYOO",
+    "OOYYYOYYYYOYYYOO",
+    ".OOYYYYYYYYYYOO.",
+    ".OOOOOYYYYOOOOO.",
+    "..OOOOOOOOOOOO..",
+    "....OOOOOOOO....",
+]
+frames = []
+for i in range(16):
+    f = blank()
+    k = 0.55 + 0.45 * random.Random(i * 13).random()
+    sprite(f, JACK, {'O': (230, 100, 0), 'g': (40, 160, 40), 'Y': scale((255, 220, 60), k)})
+    frames.append(f)
+save('hw-jack', 'Halloween', 'Jack-o\'-lantern', frames, 110)
+
+# ---- Halloween: Frankenstein's monster blinking ----
+FRANK = [
+    "..KKKKKKKKKKKK..",
+    "..KKKKKKKKKKKK..",
+    "..GGGGGGGGGGGG..",
+    "..GGKKGGGGKKGG..",
+    "..GGWBGGGGWBGG..",
+    "..GGGGGGGGGGGG..",
+    "SSGGGGGkkGGGGGSS",
+    "SSGGGGGGGGGGGGSS",
+    "..GGKKKKKKKKGG..",
+    "..GGGGGGGGGGGG..",
+    "..GGgGgGgGgGGG..",
+    "..GGGGGGGGGGGG..",
+    "...GGGGGGGGGG...",
+    "....KKKKKKKK....",
+    "...KKKKKKKKKK...",
+    "..KKKKKKKKKKKK..",
+]
+frames = []
+for i in range(20):
+    f = blank()
+    rows = [r[:] for r in FRANK]
+    if i in (8, 9, 17):   # blink
+        rows[4] = "..GGKKGGGGKKGG.."
+    sprite(f, rows, {'K': (25, 25, 30), 'G': (90, 170, 70), 'W': (240, 240, 240), 'B': (20, 20, 20), 'S': (160, 160, 170),
+                     'k': (60, 110, 45), 'g': (40, 40, 40)})
+    if i % 10 == 4:   # spark on a bolt
+        put(f, 0, 6, (255, 255, 120)); put(f, 15, 7, (255, 255, 120))
+    frames.append(f)
+save('hw-frank', 'Halloween', 'Monster', frames, 140)
+
+# ---- Halloween: vampire with a swishing cape ----
+VAMP = [
+    "................",
+    ".....KKKKKK.....",
+    "....KKKKKKKK....",
+    "....KWWKKWWK....",
+    "....WWWWWWWW....",
+    "....WRWWWWRW....",
+    "....WWWWWWWW....",
+    "....WWKKKKWW....",
+    ".....WVWWVW.....",
+    "......WWWW......",
+]
+frames = []
+for i in range(16):
+    f = blank((8, 0, 18))
+    stars_bg(f, i, 5, 6)
+    sw = int(round(1.5 * math.sin(i * 0.4)))
+    for y in range(9, 16):
+        half = 3 + (y - 9) + (sw if y > 11 else 0)
+        for x in range(8 - half, 8 + half):
+            inner = abs(x - 7.5) < (y - 8) * 0.6
+            put(f, x, y, (170, 0, 20) if inner else (20, 20, 25))
+    sprite(f, VAMP, {'K': (20, 20, 25), 'W': (225, 220, 210), 'R': (230, 0, 0), 'V': (255, 255, 255)})
+    frames.append(f)
+save('hw-vampire', 'Halloween', 'Vampire', frames, 110)
+
+# ---- Halloween: spider web with dew drops sparkling ----
+def line(f, x0, y0, x1, y1, c):
+    n = int(max(abs(x1 - x0), abs(y1 - y0))) + 1
+    for k in range(n + 1):
+        t = k / n
+        put(f, int(round(x0 + (x1 - x0) * t)), int(round(y0 + (y1 - y0) * t)), c)
+
+
+frames = []
+for i in range(18):
+    f = blank()
+    web = (85, 85, 105)
+    pts = lambda r: [(7.5 + math.cos(a * math.pi / 4) * r, 7.5 + math.sin(a * math.pi / 4) * r) for a in range(8)]
+    for (x, y) in pts(11):
+        line(f, 7.5, 7.5, x, y, web)
+    for r in (3.5, 7):
+        p = pts(r)
+        for k in range(8):
+            line(f, p[k][0], p[k][1], p[(k + 1) % 8][0], p[(k + 1) % 8][1], web)
+    for k, (x, y) in enumerate(pts(7)[::2] + pts(3.5)[1::2]):
+        put(f, int(round(x)), int(round(y)), scale((190, 230, 255), 0.35 + 0.65 * max(0, math.sin(i * 0.5 + k * 1.7))))
+    sy = 6 + int(round(3 * math.sin(i * 0.35)))   # the spider goes up and down its thread
+    line(f, 11, 0, 11, sy - 1, (150, 150, 160))
+    rect(f, 10, sy, 12, sy + 2, (190, 60, 0)); put(f, 11, sy + 3, (190, 60, 0))
+    put(f, 10, sy, (255, 230, 0)); put(f, 12, sy, (255, 230, 0))
+    for d in (0, 2):
+        put(f, 9, sy + d, (150, 40, 0)); put(f, 13, sy + d, (150, 40, 0))
+    frames.append(f)
+save('hw-web', 'Halloween', 'Spider web', frames, 110)
+
+# ---- Halloween: crow flapping on a branch ----
+CROW_UP = ["..KK....", ".KKKK...", "KKKKKK.."]
+CROW_DN = ["........", "KKKKKK..", ".KKKK..."]
+frames = []
+for i in range(12):
+    f = blank((10, 5, 25))
+    disc(f, 12, 3, 2.6, (230, 230, 190))
+    for x in range(0, 16):
+        put(f, x, 13 + (1 if x > 11 else 0), (80, 45, 20))
+    put(f, 3, 12, (80, 45, 20)); put(f, 2, 11, (80, 45, 20))
+    # body
+    rect(f, 6, 9, 9, 12, (20, 20, 28)); rect(f, 9, 8, 10, 9, (20, 20, 28))
+    put(f, 11, 9, (240, 180, 0)); put(f, 10, 8, (255, 255, 255))
+    put(f, 5, 11, (20, 20, 28)); put(f, 4, 12, (20, 20, 28))
+    wing = CROW_UP if (i // 2) % 3 else CROW_DN
+    sprite(f, wing, {'K': (45, 45, 60)}, 4, 6)
+    put(f, 7, 13, (240, 180, 0)); put(f, 9, 13, (240, 180, 0))
+    frames.append(f)
+save('hw-crow', 'Halloween', 'Crow', frames, 130)
+
+# ---- Halloween: coffin opening, two eyes inside ----
+frames = []
+for i in range(20):
+    f = blank()
+    op = min(1, max(0, (i - 4) / 6)) if i < 15 else max(0, 1 - (i - 15) / 3)
+    shape = lambda y: 2 + (y if y < 4 else 4 - (y - 4) // 3)
+    for y in range(1, 16):
+        w = shape(y - 1)
+        for x in range(8 - w, 8 + w):
+            put(f, x, y, (25, 10, 5))
+    if op > 0.2:
+        put(f, 6, 6, scale((255, 40, 0), op)); put(f, 9, 6, scale((255, 40, 0), op))
+    lid = int(round(op * 8))
+    for y in range(1, 16):
+        w = shape(y - 1)
+        for x in range(8 - w, 8 + w):
+            xx = x + lid
+            put(f, xx, y, (110, 60, 25) if (x + y) % 7 else (90, 45, 18))
+    for y in (5, 6, 7):
+        put(f, 7 + lid, y, (210, 200, 180)); put(f, 8 + lid, y, (210, 200, 180))
+    put(f, 6 + lid, 6, (210, 200, 180)); put(f, 9 + lid, 6, (210, 200, 180))
+    frames.append(f)
+save('hw-coffin', 'Halloween', 'Coffin', frames, 120)
+
+# ---- Halloween: zombie rising from the ground ----
+ZOMB = [
+    ".GGGG.",
+    "GRGGRG",
+    "GGGGGG",
+    "GKKKKG",
+    ".GGGG.",
+    "..BB..",
+    "BBBBBB",
+    "GBBBBG",
+    "GBBBBG",
+    ".BBBB.",
+]
+frames = []
+for i in range(24):
+    f = blank((5, 5, 20))
+    stars_bg(f, i, 9, 7)
+    rise = min(10, i) if i < 18 else 10 - (i - 18) * 2
+    y0 = 15 - rise
+    sprite(f, ZOMB, {'G': (110, 160, 80), 'R': (230, 30, 30), 'K': (30, 30, 30), 'B': (70, 60, 120)}, 5, y0)
+    if i % 4 < 2 and rise >= 8:
+        put(f, 4, y0 + 6, (110, 160, 80)); put(f, 11, y0 + 6, (110, 160, 80))
+    for x in range(16):
+        put(f, x, 14, (60, 35, 15)); put(f, x, 15, (45, 25, 10))
+    put(f, 1, 12, (120, 120, 130)); rect(f, 0, 10, 2, 13, (120, 120, 130)); put(f, 1, 11, (60, 60, 70))
+    frames.append(f)
+save('hw-zombie', 'Halloween', 'Zombie', frames, 120)
+
+# ---- Halloween: "DOCES OU TRAVESSURAS" ----
+save('hw-doces', 'Halloween', 'Doces ou travessuras', scroll35(' DOCES OU TRAVESSURAS! ',
+     lambda x, y, i: (255, 120, 0) if ((x + i) // 3) % 2 else (170, 60, 255), (8, 0, 14),
+     lambda f, i: [put(f, (k * 5 + i // 2) % 16, 14 + k % 2, (40, 30, 60)) for k in range(4)]), 60)
+
+# ---- Christmas: angel with glowing halo and flapping wings ----
+ANGEL = [
+    "......YYYY......",
+    ".....Y....Y.....",
+    "......YYYY......",
+    "......SSSS......",
+    "......SBSB......",
+    "......SSSS......",
+    ".......SS.......",
+    "......WWWW......",
+    ".....WWWWWW.....",
+    ".....WWWWWW.....",
+    "....WWWWWWWW....",
+    "....WWWWWWWW....",
+    "...WWWWWWWWWW...",
+    "...WWWWWWWWWW...",
+    "....YYYYYYYY....",
+]
+frames = []
+for i in range(14):
+    f = blank((0, 6, 24))
+    stars_bg(f, i, 11, 8, (120, 120, 80))
+    up = (i // 2) % 2
+    for y in range(7, 13):
+        for d in range(1, 4 - (y - 7) // 2):
+            put(f, 5 - d, y - up, (200, 220, 255)); put(f, 10 + d, y - up, (200, 220, 255))
+    k = 0.6 + 0.4 * math.sin(i * 0.45)
+    sprite(f, ANGEL, {'Y': scale((255, 220, 80), k), 'S': (245, 200, 160), 'B': (40, 40, 80), 'W': (245, 245, 255)}, 0, 1)
+    frames.append(f)
+save('xm-angel', 'Christmas', 'Angel', frames, 120)
+
+# ---- Christmas: hot chocolate with steam ----
+frames = []
+for i in range(16):
+    f = blank((20, 10, 5))
+    rect(f, 3, 8, 11, 14, (200, 30, 40))
+    for x in range(3, 12):
+        put(f, x, 10 + (x % 2), (255, 255, 255))   # white zig-zag
+    rect(f, 4, 8, 10, 8, (90, 45, 20))
+    for y in (9, 10, 11, 12):
+        put(f, 12, y, (200, 30, 40)); put(f, 13, y, (200, 30, 40) if y in (9, 12) else None)
+    put(f, 13, 10, (200, 30, 40)); put(f, 14, 10, (200, 30, 40)); put(f, 14, 11, (200, 30, 40)); put(f, 13, 11, (200, 30, 40))
+    put(f, 13, 10, None)
+    rect(f, 2, 15, 12, 15, (150, 150, 160))
+    put(f, 6, 7, (245, 240, 230)); put(f, 8, 7, (245, 240, 230))   # marshmallows
+    for s in range(3):
+        for k in range(5):
+            y = 6 - k - ((i + s * 5) % 16) // 4
+            x = 5 + s * 2 + int(round(math.sin((i + k) * 0.7 + s)))
+            if 0 <= y < 7:
+                put(f, x, y, scale((200, 200, 210), 0.3 + 0.12 * (5 - k)))
+    frames.append(f)
+save('xm-cocoa', 'Christmas', 'Hot chocolate', frames, 120)
+
+# ---- Christmas: toy train crossing ----
+frames = []
+for i in range(32):
+    f = blank((0, 10, 30))
+    for k in range(6):
+        put(f, (k * 7 + 3) % 16, (k * 5 + i // 3) % 11, (180, 190, 210))
+    for x in range(16):
+        put(f, x, 14, (90, 60, 40))
+        if x % 2 == 0:
+            put(f, x, 15, (60, 40, 25))
+    ox = 18 - i
+    def car(x0, c):
+        rect(f, x0, 9, x0 + 4, 12, c)
+        put(f, x0 + 1, 13, (40, 40, 40)); put(f, x0 + 3, 13, (40, 40, 40))
+    # engine
+    rect(f, ox, 8, ox + 4, 12, (30, 120, 40)); rect(f, ox + 3, 6, ox + 4, 7, (30, 120, 40))
+    rect(f, ox, 6, ox + 1, 8, (220, 180, 30)); put(f, ox - 1, 12, (200, 30, 30))
+    put(f, ox + 1, 13, (40, 40, 40)); put(f, ox + 3, 13, (40, 40, 40))
+    put(f, ox + 3, 5 - (i % 2), (200, 200, 210)); put(f, ox + 4, 4 - (i % 2), (150, 150, 160))
+    car(ox + 6, (200, 30, 40)); put(f, ox + 8, 8, (255, 220, 40))
+    car(ox + 12, (40, 90, 220)); put(f, ox + 14, 8, (40, 200, 60))
+    frames.append(f)
+save('xm-train', 'Christmas', 'Toy train', frames, 80)
+
+# ---- Christmas: polar bear waving ----
+BEAR = [
+    "..WW......WW..",
+    ".WWWWWWWWWWWW.",
+    ".WWWWWWWWWWWW.",
+    ".WWKWWWWWWKWW.",
+    ".WWWWWKKWWWWW.",
+    "..WWWWKKWWWW..",
+    "..WWWWWWWWWW..",
+    ".RRRRRRRRRRRR.",
+    "WWWWWWWWWWWWWW",
+    "WWWWWWWWWWWWWW",
+    ".WWWWWWWWWWWW.",
+    ".WWWW....WWWW.",
+]
+frames = []
+for i in range(14):
+    f = blank((10, 30, 60))
+    for k in range(6):
+        put(f, (k * 5 + 1) % 16, (k * 3 + i) % 16, (200, 220, 240))
+    sprite(f, BEAR, {'W': (240, 245, 250), 'K': (20, 20, 30), 'R': (210, 30, 40)}, 1, 4)
+    wave = (i // 2) % 2
+    put(f, 15, 11 - wave * 2, (240, 245, 250)); put(f, 15, 12 - wave * 2, (240, 245, 250)); put(f, 14, 12, (240, 245, 250))
+    frames.append(f)
+save('xm-polarbear', 'Christmas', 'Polar bear', frames, 140)
+
+# ---- Christmas: snow globe being shaken ----
+frames = []
+for i in range(24):
+    f = blank()
+    disc(f, 7.5, 7, 6.6, (20, 50, 110))
+    for y in range(4, 12):   # a little Christmas tree
+        w = 1 + (y - 4) // 2
+        for x in range(8 - w, 8 + w):
+            put(f, x, y, (30, 140, 50))
+    put(f, 7, 3, (255, 220, 40)); put(f, 8, 3, (255, 220, 40)); put(f, 6, 8, (230, 30, 30)); put(f, 9, 10, (60, 160, 255))
+    rect(f, 7, 12, 8, 12, (110, 60, 20))
+    for x in range(3, 13):
+        put(f, x, 13, (230, 235, 245))
+    rect(f, 3, 14, 12, 15, (150, 80, 30))
+    rnd = random.Random(31)
+    shake = i < 6
+    for k in range(14):
+        x0, y0 = rnd.random() * 12 + 2, rnd.random() * 12 + 1
+        y = (y0 + (i * 0.4 if not shake else rnd.random() * 10)) % 12 + 1
+        x = x0 + math.sin(i * 0.5 + k) * (2 if shake else 0.7)
+        xi, yi = int(round(x)), int(round(y))
+        if (xi - 7.5) ** 2 + (yi - 7) ** 2 <= 36 and yi < 13:
+            put(f, xi, yi, (255, 255, 255))
+    frames.append(f)
+save('xm-globe', 'Christmas', 'Snow globe', frames, 100)
+
+# ---- Christmas: shooting star over the stable ----
+frames = []
+for i in range(20):
+    f = blank((0, 0, 20))
+    stars_bg(f, i, 21, 10, (90, 90, 130))
+    sx, sy = 14 - i * 0.6, 1 + i * 0.25
+    for k in range(5):
+        put(f, int(round(sx + k)), int(round(sy - k * 0.4)), scale((255, 230, 140), 1 - k / 5))
+    # stable
+    for y in range(9, 16):
+        w = min(7, y - 6)
+        for x in range(8 - w, 8 + w):
+            put(f, x, y, (100, 55, 20) if y < 11 else (70, 40, 15))
+    rect(f, 6, 12, 9, 15, (25, 15, 5))
+    put(f, 7, 13, (255, 200, 80)); put(f, 8, 13, (255, 200, 80))
+    big = 0.6 + 0.4 * math.sin(i * 0.6)
+    for d in ((0, 0), (0, 1), (0, -1), (1, 0), (-1, 0)):
+        put(f, 8 + d[0], 5 + d[1], scale((255, 240, 160), big if d != (0, 0) else 1))
+    frames.append(f)
+save('xm-shootingstar', 'Christmas', 'Star of Bethlehem', frames, 110)
+
+# ---- Christmas: "FELIZ NATAL" and "BOAS FESTAS" ----
+xmbg = lambda f, i: [put(f, (k * 5 + 2) % 16, (k * 3 + i // 2) % 16, (55, 65, 90)) for k in range(7)]
+save('xm-feliznatal', 'Christmas', 'Feliz Natal', scroll35(' FELIZ NATAL! ', lambda x, y, i: (230, 20, 30) if ((x + i) // 3) % 2 else (40, 200, 60), (0, 0, 0), xmbg), 65)
+save('xm-boasfestas', 'Christmas', 'Boas festas', scroll35(' BOAS FESTAS! ', lambda x, y, i: (255, 210, 60) if y < 3 else (255, 255, 255), (0, 15, 40), xmbg), 65)
+
+# ---- Celebrations: "PARABENS" with confetti ----
+def confetti_bg(f, i):
+    rnd = random.Random(2)
+    for k in range(10):
+        x0, sp, c = rnd.randrange(16), 1 + rnd.random(), rnd.choice([(255, 60, 60), (60, 200, 255), (255, 220, 40), (120, 255, 90), (255, 90, 220)])
+        put(f, x0, int(i * sp + k * 3) % 16, scale(c, 0.5))
+save('ev-parabens', 'Celebrations', 'Parabéns', scroll35(' PARABENS! ', lambda x, y, i: wh((x + i) / 16.0), (0, 0, 0), confetti_bg), 65)
+
+# ---- Celebrations: cupcake with a flickering candle ----
+frames = []
+for i in range(14):
+    f = blank((15, 0, 20))
+    for y in range(10, 16):
+        w = 5 - (y - 10) // 3
+        for x in range(8 - w, 8 + w):
+            put(f, x, y, (230, 150, 60) if x % 2 else (200, 120, 40))
+    for y in range(6, 10):
+        w = 6 - abs(y - 8)
+        for x in range(8 - w, 8 + w):
+            put(f, x, y, (255, 150, 200))
+    for k, (x, y) in enumerate(((4, 8), (7, 7), (10, 8), (6, 9), (9, 9), (12, 9))):
+        put(f, x, y, [(255, 50, 50), (60, 200, 255), (255, 230, 40), (120, 255, 90)][k % 4])
+    rect(f, 7, 3, 8, 5, (90, 170, 255))
+    flame(f, 7, -1, i, 9)
+    frames.append(f)
+save('ev-cupcake', 'Celebrations', 'Cupcake', frames, 100)
+
+# ---- Celebrations: flower blooming ----
+frames = []
+for i in range(20):
+    f = blank((0, 10, 25))
+    rect(f, 7, 9, 8, 15, (40, 150, 50))
+    put(f, 5, 12, (50, 180, 60)); put(f, 6, 12, (50, 180, 60)); put(f, 9, 11, (50, 180, 60)); put(f, 10, 11, (50, 180, 60))
+    op = min(1, i / 10)
+    r = 1 + op * 3.5
+    disc(f, 7.5, 5.5, r * 0.75, (255, 110, 175))
+    for a in range(5):
+        ang = a * 2 * math.pi / 5 + i * 0.05
+        disc(f, 7.5 + math.cos(ang) * r * 0.9, 5.5 + math.sin(ang) * r * 0.9, max(1, r * 0.55), (255, 90, 160) if a % 2 else (255, 130, 190))
+    disc(f, 7.5, 5.5, 1.3, (255, 210, 40))
+    frames.append(f)
+frames += [frames[-1]] * 6
+save('ev-flower', 'Celebrations', 'Flower', frames, 110)
+
+# ---- Celebrations: butterfly ----
+frames = []
+for i in range(12):
+    f = blank((0, 20, 35))
+    open_ = 0.3 + 0.7 * abs(math.cos(i * math.pi / 6))
+    span = 2 + int(round(open_ * 4))
+    for y in range(3, 13):
+        top = y < 8
+        for d in range(1, span + 1):
+            if (top and abs(y - 5) <= d * 0.6 + 1) or (not top and abs(y - 10) <= d * 0.5 + 0.5):
+                c = (255, 140, 0) if top else (255, 70, 160)
+                if d == span or (d + y) % 5 == 0:
+                    c = (40, 20, 60)
+                put(f, 7 - d + 1, y, c); put(f, 8 + d - 1, y, c)
+    rect(f, 7, 3, 8, 12, (40, 25, 20))
+    put(f, 6, 1, (40, 25, 20)); put(f, 9, 1, (40, 25, 20)); put(f, 7, 2, (40, 25, 20)); put(f, 8, 2, (40, 25, 20))
+    frames.append(f)
+save('ev-butterfly', 'Celebrations', 'Butterfly', frames, 90)
+
+# ---- Celebrations: rocket ----
+frames = []
+for i in range(24):
+    f = blank((0, 0, 18))
+    stars_bg(f, i, 41, 12, (120, 120, 160))
+    for k in range(12):
+        x, y = (k * 9 + 3) % 16, (k * 5 + i) % 16
+        put(f, x, y, (60, 60, 90))
+    y0 = 3 + int(round(math.sin(i * 0.5)))
+    rect(f, 6, y0 + 2, 9, y0 + 8, (230, 230, 240))
+    put(f, 7, y0, (220, 40, 40)); put(f, 8, y0, (220, 40, 40)); rect(f, 6, y0 + 1, 9, y0 + 1, (220, 40, 40))
+    put(f, 7, y0 + 4, (60, 160, 255)); put(f, 8, y0 + 4, (60, 160, 255))
+    rect(f, 4, y0 + 7, 5, y0 + 9, (220, 40, 40)); rect(f, 10, y0 + 7, 11, y0 + 9, (220, 40, 40))
+    for k in range(4):
+        c = [(255, 255, 160), (255, 200, 40), (255, 110, 0), (200, 30, 0)][k]
+        w = 2 if k < 2 else 1 + (i + k) % 2
+        for x in range(8 - w, 8 + w):
+            put(f, x, y0 + 9 + k, c if random.Random(i * 5 + k + x).random() > 0.2 else None)
+    frames.append(f)
+save('ev-rocket', 'Celebrations', 'Rocket', frames, 80)
+
+# ---- Celebrations: disco ball ----
+frames = []
+for i in range(16):
+    f = blank()
+    rect(f, 7, 0, 8, 2, (130, 130, 140))
+    for y in range(3, 15):
+        for x in range(16):
+            dx, dy = x - 7.5, y - 8.5
+            if dx * dx + dy * dy <= 30:
+                tile = ((x + i) // 2 + y // 2) % 4
+                c = [(90, 90, 110), (170, 170, 190), (230, 230, 255), (130, 130, 150)][tile]
+                if random.Random(x * 31 + y * 7 + i).random() > 0.93:
+                    c = wh((x + y + i) / 12.0)
+                put(f, x, y, c)
+    for k in range(4):   # light spots on the floor and walls
+        ang = i * 0.4 + k * 1.57
+        x, y = int(round(7.5 + math.cos(ang) * 7)), int(round(8.5 + math.sin(ang) * 7))
+        if not (0 <= (x - 7.5) ** 2 + (y - 8.5) ** 2 <= 30):
+            put(f, x, y, wh(k / 4))
+    frames.append(f)
+save('ev-disco', 'Celebrations', 'Disco ball', frames, 90)
 
 with open(os.path.join(OUT, 'pack.json'), 'w') as fp:
     json.dump(PACK, fp, separators=(',', ':'))
