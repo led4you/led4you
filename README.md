@@ -19,7 +19,7 @@ O firmware é uma versão própria do [WLED](https://github.com/wled/WLED) 16.0.
 - **Texto em matriz**: movimento para a esquerda, direita, cima e baixo, 5 tipos de letra, degradê e arco-íris, **emojis** e acentos (á, ã, ç…).
 - **Zonas**: divide as luzes em partes (por saída, por painel da matriz ou à mão), cada uma com o seu efeito, texto ou imagem; as zonas ficam guardadas na placa.
 - **Os meus LEDs**: cada LED com a sua cor e comportamento (fixo, piscar, respirar, cintilar, arco-íris), com modo de desenho.
-- **Imagens e GIFs**: pacote de 55 GIFs de Halloween, Natal e festas, os teus próprios GIFs e fotos; um GIF diferente em cada zona (até 4 ao mesmo tempo; na ESP32‑C3 conforme a memória livre) e "Tocar todos" por zona.
+- **Imagens e GIFs**: pacote de 77 GIFs de Halloween, Natal e festas (alguns com mensagens em português), os teus próprios GIFs e fotos; um GIF diferente em cada zona (até 4 ao mesmo tempo; na ESP32‑C3 conforme a memória livre) e "Tocar todos" por zona.
 - **Épocas**: temas prontos de Halloween e Natal e efeitos próprios (Candy Cane, Snowfall, Haunted, Retro Tree).
 - **Ver na casa**: experimenta os efeitos numa árvore, casa, jardim ou janela antes de pores as luzes.
 - **Leitura com a câmara**: a app encontra onde está cada LED (como na Twinkly) e mostra os efeitos numa foto das tuas luzes.
