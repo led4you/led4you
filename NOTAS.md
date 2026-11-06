@@ -77,7 +77,7 @@ A página dos visitantes (`show/index.html`) só precisa de push.
 - Página de controlo (só na rede de casa): <http://192.168.1.97:8099>
 - Visitantes, Halloween: <https://led4you.github.io/led4you/show/?t=l4yshow-3352b4beefd1&tema=hw>
 - Visitantes, Natal: <https://led4you.github.io/led4you/show/?t=l4yshow-3352b4beefd1&tema=xm>
-- Ponte v13: cada lado é independente, um pedido novo substitui logo o anterior (opção para esperar a vez), sem
+- Ponte v14: cada lado é independente, um pedido novo substitui logo o anterior (opção para esperar a vez), sem
   espera entre pedidos (configurável), tempos até 5 min (efeito 3 min de origem), opção "deixar o último pedido",
   efeitos sugeridos + todos os da placa, com cores e paleta.
 - Cartazes A3 (Natal, Halloween) e seta de direção: canvas "Cartaz A3 – Cubo das crianças" no Claude.

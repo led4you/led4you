@@ -69,6 +69,11 @@ FX_SKIP = {"RSVD", "Image", "Scrolling Text", "My LEDs", "Solid", "Blink", "Blin
            "Strobe Mega", "Multi Strobe", "Lightning"}   # não fazem sentido como pedido (ou piscam demasiado para crianças)
 
 
+def isint(v):
+    """um número inteiro de verdade (em Python, True e False também contam como int)"""
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
 def fx_names(ip):
     """os nomes dos efeitos da placa (a posição na lista é o número do efeito) e os dados de cada um"""
     t, names, data = fx_cache.get(ip, (0, None, None))
@@ -206,7 +211,7 @@ def check(msg, allow_free=False):
     if not isinstance(m, dict) or not S["faces"]:
         return None
     k, z = m.get("k"), m.get("z", -1)
-    if not isinstance(z, int) or z < -1 or z >= len(S["faces"]):
+    if not isint(z) or z < -1 or z >= len(S["faces"]):
         return None
     faces = S["faces"] if z == -1 else [S["faces"][z]]
     where = "todos os lados" if z == -1 or len(S["faces"]) == 1 else (S["faces"][z].get("n") or "lado %d" % (z + 1))
@@ -226,7 +231,7 @@ def check(msg, allow_free=False):
             if not t:
                 return None
         c = m.get("c", 3)
-        c = PAL[c] if isinstance(c, int) and 1 <= c < len(PAL) else PAL[3]
+        c = PAL[c] if isint(c) and 1 <= c < len(PAL) else PAL[3]
         rgb = [int(c[i:i + 2], 16) for i in (0, 2, 4)]
         return "text", segs({"fx": FX_TEXT, "n": t, "col": [rgb, [0, 0, 0], rgb], "sx": 140, "ix": 128, "c1": 0, "c2": 128, "c3": 16,
                              "o1": False, "o2": False, "o3": False, "tp": False, "frz": False}), {"t": t, "c": c, "where": where}
@@ -249,16 +254,16 @@ def check(msg, allow_free=False):
         part = {"fx": 0, "fxdef": True, "frz": False}
         # v13: a paleta (0 = a do próprio efeito) e as duas cores escolhidas pelos visitantes (das 8 cores da página)
         pal = m.get("pal", 0)
-        if isinstance(pal, int) and 1 <= pal <= 120:
+        if isint(pal) and 1 <= pal <= 120:
             part["pal"] = pal
         c = m.get("c")
-        if isinstance(c, list) and len(c) == 2 and all(isinstance(i, int) and 0 <= i < len(PAL) for i in c):
+        if isinstance(c, list) and len(c) == 2 and all(isint(i) and 0 <= i < len(PAL) for i in c):
             part["col"] = [[int(PAL[i][j:j + 2], 16) for j in (0, 2, 4)] for i in c] + [[0, 0, 0]]
         return "fx", segs(part), {"e": e, "n": n, "where": where}
     if k == "draw":
         p = str(m.get("p", ""))
         w, h = m.get("w"), m.get("h")
-        if any(f["w"] != w or f["h"] != h for f in faces) or not isinstance(w, int) or len(p) != w * h or not re.fullmatch(r"[0-8]+", p):
+        if any(f["w"] != w or f["h"] != h for f in faces) or not isint(w) or len(p) != w * h or not re.fullmatch(r"[0-8]+", p):
             return None
         pix = [0, w * h, "000000"]
         for i, ch in enumerate(p):
@@ -666,17 +671,17 @@ class Admin(BaseHTTPRequestHandler):
                 if isinstance(b.get("faces"), list):
                     fs = []
                     for f in b["faces"][:8]:
-                        if isinstance(f, dict) and isinstance(f.get("zone"), int) and 0 <= f["zone"] < 32 and all(isinstance(f.get(k), int) and 1 <= f[k] <= FACE_MAX for k in ("w", "h")):
+                        if isinstance(f, dict) and isint(f.get("zone")) and 0 <= f["zone"] < 32 and all(isint(f.get(k)) and 1 <= f[k] <= FACE_MAX for k in ("w", "h")):
                             fs.append({"zone": f["zone"], "w": f["w"], "h": f["h"], "n": str(f.get("n", ""))[:20]})
                     S["faces"] = fs
                 if b.get("theme") in ("hw", "xm", "ev", ""):
                     S["theme"] = b["theme"]
-                if isinstance(b.get("wait"), int) and 0 <= b["wait"] <= 600:
+                if isint(b.get("wait")) and 0 <= b["wait"] <= 600:
                     S["wait"] = b["wait"]
                 if isinstance(b.get("seconds"), dict):
                     for k in ("text", "gif", "draw", "fx"):
                         v = b["seconds"].get(k)
-                        if isinstance(v, int) and 3 <= v <= 300:
+                        if isint(v) and 3 <= v <= 300:
                             S["seconds"][k] = v
                 save()
             log("definições guardadas" + (" (ligado)" if S["on"] else " (desligado)"))
