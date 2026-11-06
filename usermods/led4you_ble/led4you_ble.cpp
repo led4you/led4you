@@ -243,6 +243,7 @@ class Led4youBle : public Usermod {
 
     // Improv RPC may arrive split over several writes: [cmd][len][data...][checksum]
     void onRpcWrite(const uint8_t* d, size_t len) {
+      if (len > sizeof(rpcBuf)) { rpcLen = 0; return; }   // v102: one write can be up to 514 bytes (MTU 517): too big for the buffer
       if (rpcLen + len > sizeof(rpcBuf)) rpcLen = 0;
       memcpy(rpcBuf + rpcLen, d, len); rpcLen += len;
       if (rpcLen >= 2 && rpcLen >= (size_t)rpcBuf[1] + 3) {
@@ -253,7 +254,7 @@ class Led4youBle : public Usermod {
 
     // JSON command may be split too: collect until braces balance
     void onCmdWrite(const uint8_t* d, size_t len) {
-      if (!cmdBuf) return;
+      if (!cmdBuf || len > L4Y_JSON_MAX) return;
       if (cmdLen + len > L4Y_JSON_MAX) cmdLen = 0;
       memcpy(cmdBuf + cmdLen, d, len); cmdLen += len;
       int depth = 0; bool started = false, inStr = false;
@@ -320,8 +321,9 @@ class Led4youBle : public Usermod {
           memcpy(multiWiFi[0].clientSSID, data + 1, sl);
           memset(multiWiFi[0].clientPass, 0, sizeof(multiWiFi[0].clientPass));
           if (dlen > sl + 1) {
-            uint8_t pl = data[sl + 1];
-            memcpy(multiWiFi[0].clientPass, data + sl + 2, min((size_t)pl, sizeof(multiWiFi[0].clientPass) - 1));
+            size_t pl = data[sl + 1];
+            pl = min(pl, (size_t)dlen - sl - 2);   // v102: never read past the end of the packet
+            memcpy(multiWiFi[0].clientPass, data + sl + 2, min(pl, sizeof(multiWiFi[0].clientPass) - 1));
           }
           forceReconnect = true;
           configNeedsWrite = true;   // saved by WLED's loop (retried there if the JSON buffer is busy)
