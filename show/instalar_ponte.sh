@@ -48,7 +48,9 @@ S = {   # definições (guardadas em show_config.json)
     "wait": 0,            # segundos entre dois pedidos do mesmo telemóvel (0 = sem espera)
     "hold": False,        # True = o último pedido fica nas luzes até chegar outro (dá tempo para fotografias)
     "wait_turn": False,
-    "fx_all": True,       # True = os visitantes também podem escolher qualquer efeito da placa (além das sugestões do tema)   # False = um pedido novo substitui logo o que está no lado; True = espera que o anterior acabe
+    "fx_all": True,
+    "idle_ps": 0,         # v15: preset posto na placa depois de "idle_min" minutos sem pedidos (0 = não mexe)
+    "idle_min": 5,       # True = os visitantes também podem escolher qualquer efeito da placa (além das sugestões do tema)   # False = um pedido novo substitui logo o que está no lado; True = espera que o anterior acabe
     "free": True,         # True = escrever texto livre (com filtro de palavrões); False = só as mensagens prontas
 }
 # mensagens prontas (iguais às da página dos visitantes)
@@ -331,6 +333,8 @@ def show_loop():
     saved = None          # (placa, estado da placa antes dos pedidos): cada lado volta ao que estava
     busy = {}             # zona -> até quando está a mostrar um pedido
     shown = {}            # zona -> o que está a mostrar (para a página de controlo)
+    last_job = 0.0        # hora do último pedido mostrado (para o preset sem pedidos)
+    idle_done = True      # o preset sem pedidos já foi posto desde o último pedido
     while True:
         try:
             while True:
@@ -384,6 +388,8 @@ def show_loop():
                     busy[z] = until
                     shown[z] = what
                 started = True
+                last_job = time.time()
+                idle_done = False
             except Exception as e:
                 log("a placa não respondeu:", e)
                 waiting.insert(0, job)
@@ -407,6 +413,17 @@ def show_loop():
                 log("não voltei ao estado anterior:", e)
         if not busy and not waiting and not S["hold"]:
             saved = None
+        # v15: muito tempo sem pedidos: o cubo volta ao preset escolhido (também com "deixar o último pedido")
+        ps, mins = S.get("idle_ps", 0), S.get("idle_min", 5)
+        if (not idle_done and isint(ps) and ps > 0 and not waiting and not any(t > now for t in busy.values())
+                and now - last_job >= max(1, mins) * 60):
+            try:
+                http_json(ip, "/json/state", {"ps": ps})
+                log("%d min sem pedidos: preset %d" % (mins, ps))
+                busy.clear(); shown.clear(); saved = None
+            except Exception as e:
+                log("não consegui pôr o preset:", e)
+            idle_done = True
         now_showing["what"] = " · ".join(shown[z] for z in sorted(shown))
         if not started:
             time.sleep(0.3)
@@ -561,6 +578,10 @@ pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:2
   <input type="number" id="wait" min="0" max="600">
   <label class="big" style="font-size:16px"><input type="checkbox" id="hold"> Deixar o último pedido nas luzes até chegar outro</label>
   <div class="note">Dá tempo para tirar fotografias. Desligado: depois do tempo, as luzes voltam ao que mostravam antes.</div>
+  <label for="idlePs">Sem pedidos, voltar ao preset</label>
+  <div class="row"><select id="idlePs"><option value="0">Não (fica como está)</option></select>
+    <span>depois de</span><input type="number" id="idleMin" min="1" max="120" style="width:5em"><span>minutos</span></div>
+  <div class="note">Depois desse tempo sem nenhum pedido, o cubo volta ao preset escolhido (os presets vêm da placa).</div>
   <label class="big" style="font-size:16px"><input type="checkbox" id="fxAll"> Mostrar aos visitantes todos os efeitos da placa</label>
   <div class="note">Além das sugestões do tema. Ficam de fora os efeitos de som e os que piscam muito.</div>
   <label class="big" style="font-size:16px"><input type="checkbox" id="waitTurn"> Cada pedido espera que o anterior acabe</label>
@@ -598,7 +619,7 @@ function render(){
  if(!editing){opt($('board'),[['','Escolha uma placa']].concat(st.boards.map(b=>[b.ip,b.name+' ('+b.ip+')'])).concat(st.board&&!st.boards.some(b=>b.ip===st.board)?[[st.board,(st.boardName||st.board)+' ('+st.board+')']]:[]),st.board);
   if(zonesFor!==st.board){zonesFor=st.board;loadZones(st.board,st.faces);}
   $('free').checked=st.free;
-  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('waitTurn').checked=!!st.wait_turn;$('fxAll').checked=st.fx_all!==false;$('approve').checked=st.approve;}
+  $('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('waitTurn').checked=!!st.wait_turn;$('fxAll').checked=st.fx_all!==false;$('idleMin').value=st.idle_min||5;setIdle(st.idle_ps||0);$('approve').checked=st.approve;}
  const qk=st.urls.hw+st.urls.xm;$('url_hw').textContent=st.urls.hw;$('url_xm').textContent=st.urls.xm;
  if(qrFor!==qk&&window.QRCode){for(const t of ['hw','xm']){$('qr_'+t).replaceChildren();new QRCode($('qr_'+t),{text:st.urls[t],width:200,height:200,correctLevel:QRCode.CorrectLevel.M});}qrFor=qk;}
  $('pendCard').hidden=!st.pending.length;
@@ -609,18 +630,22 @@ function render(){
   const no=document.createElement('button');no.className='btn';no.textContent='Recusar';no.onclick=()=>api('reject',{id:p.id}).then(refresh);
   d.append(w,ok,no);return d;}));
  $('now').textContent=st.now?'Agora na matriz: '+st.now+' · '+st.queue+' em fila':st.queue+' em fila';$('log').textContent=st.log.slice().reverse().join('\n');}
+let idleWant=0;
+function setIdle(v){idleWant=v;const sel=$('idlePs');if(![...sel.options].some(o=>+o.value===v)&&v>0){const o=document.createElement('option');o.value=v;o.textContent='Preset '+v;sel.append(o);}sel.value=String(v);}
+async function loadPresets(){let l=[];try{l=await api('presets');}catch(e){}const sel=$('idlePs');sel.replaceChildren(new Option('Não (fica como está)','0'),...l.map(p=>new Option(p.id+' · '+p.n,String(p.id))));setIdle(idleWant);}
 async function refresh(){st=await api('state');render();}
 $('on').onchange=()=>api('settings',{on:$('on').checked}).then(refresh);
 $('board').onfocus=()=>editing=true;
-['sText','sGif','sDraw','sFx','wait','theme','approve','free','hold','waitTurn','fxAll'].forEach(id=>{const e=$(id);e.addEventListener('focus',()=>editing=true);e.addEventListener('input',()=>editing=true);e.addEventListener('change',()=>editing=true);});   // v9: the 3 s refresh no longer puts back the old times while typing
+['sText','sGif','sDraw','sFx','wait','theme','approve','free','hold','waitTurn','fxAll','idlePs','idleMin'].forEach(id=>{const e=$(id);e.addEventListener('focus',()=>editing=true);e.addEventListener('input',()=>editing=true);e.addEventListener('change',()=>editing=true);});   // v9: the 3 s refresh no longer puts back the old times while typing
 $('board').onchange=()=>{editing=true;loadZones($('board').value,[]);};$('free').onchange=()=>editing=true;$('hold').onchange=()=>editing=true;$('wait').oninput=()=>editing=true;
 $('scan').onclick=async()=>{$('scanMsg').textContent='A procurar… (até 10 s)';const r=await api('scan',{});$('scanMsg').textContent=r.length+' placa(s) encontrada(s)';editing=false;await refresh();};
 $('save').onclick=async()=>{const b=st.boards.find(x=>x.ip===$('board').value);const faces=facesNow();
  if(!faces.length){$('saveMsg').textContent='Marque pelo menos um lado.';return;}
- await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,hold:$('hold').checked,wait_turn:$('waitTurn').checked,fx_all:$('fxAll').checked,wait:Math.max(0,Math.min(600,+$('wait').value|0)),seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value}});
+ await api('settings',{board:$('board').value,boardName:b?b.name:(st.board===$('board').value?st.boardName:''),faces,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,hold:$('hold').checked,wait_turn:$('waitTurn').checked,fx_all:$('fxAll').checked,idle_ps:+$('idlePs').value|0,idle_min:Math.max(1,Math.min(120,+$('idleMin').value|0)),wait:Math.max(0,Math.min(600,+$('wait').value|0)),seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value}});loadPresets();
  editing=false;$('saveMsg').textContent='Guardado.';setTimeout(()=>$('saveMsg').textContent='',2500);refresh();};
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(st.urls[b.dataset.copy]).then(()=>{b.textContent='Copiado';setTimeout(()=>b.textContent='Copiar endereço',2000);}));
 $('test').onclick=()=>api('test',{t:$('testTxt').value||'Ola!'}).then(refresh);
+loadPresets();
 refresh();setInterval(()=>{if(!editing)refresh();},3000);
 </script></body></html>"""
 
@@ -652,6 +677,14 @@ class Admin(BaseHTTPRequestHandler):
             with lock:
                 return self.send(200, dict(S, boards=boards, url=qr_url(), urls={"hw": qr_url("hw"), "xm": qr_url("xm")}, log=logs[-40:], now=now_showing["what"], queue=jobs.qsize() + len(waiting),
                                          pending=[{k: v for k, v in x.items() if k != "cmd"} for x in pending]))
+        if p == "/api/presets":   # v15: os presets da placa escolhida, para "voltar ao preset sem pedidos"
+            try:
+                pj = http_json(S["board"], "/presets.json") if S["board"] else {}
+                out = sorted(({"id": int(k), "n": str(v.get("n") or ("Preset " + k))[:40]} for k, v in pj.items()
+                              if k.isdigit() and 0 < int(k) < 251 and isinstance(v, dict) and v), key=lambda x: x["id"])
+            except Exception:
+                out = []
+            return self.send(200, out)
         if p == "/api/zones":
             ip = self.path.split("ip=", 1)[-1] if "ip=" in self.path else ""
             ip = urllib.request.unquote(ip)
@@ -685,6 +718,10 @@ class Admin(BaseHTTPRequestHandler):
                     S["faces"] = fs
                 if b.get("theme") in ("hw", "xm", "ev", ""):
                     S["theme"] = b["theme"]
+                if isint(b.get("idle_ps")) and 0 <= b["idle_ps"] <= 250:
+                    S["idle_ps"] = b["idle_ps"]
+                if isint(b.get("idle_min")) and 1 <= b["idle_min"] <= 120:
+                    S["idle_min"] = b["idle_min"]
                 if isint(b.get("wait")) and 0 <= b["wait"] <= 600:
                     S["wait"] = b["wait"]
                 if isinstance(b.get("seconds"), dict):

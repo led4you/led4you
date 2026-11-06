@@ -1,4 +1,4 @@
-# Cubo das crianças (LED4YOU) — v13
+# Cubo das crianças (LED4YOU) — v15
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho.
@@ -65,6 +65,8 @@ Cada zona é uma matriz com o seu tamanho.
 - **Tempo** de cada mensagem, imagem, efeito (3 minutos de origem) e desenho.
 - **Espera entre pedidos do mesmo telemóvel**: 0 de origem (sem espera).
 - **Deixar o último pedido nas luzes até chegar outro**: dá tempo para tirar fotografias.
+- **Sem pedidos, voltar ao preset** (v15): escolha um preset da placa e os minutos (5 de origem); passado esse
+  tempo sem nenhum pedido, o cubo volta a esse preset.
 - **Deixar escrever texto livre**: ligado de origem. Se o desligar, só se podem enviar as mensagens prontas.
 - **Aprovar cada pedido**: os pedidos ficam em "Por aprovar", com os botões Mostrar / Recusar.
 - **Códigos QR**: dois, um para cada tema, com o botão Copiar endereço. **Não mudam**: pode mudar lados ou tempos
