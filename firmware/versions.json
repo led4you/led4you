@@ -1,3 +1,3 @@
-[{ "version": 102, "manifest": "manifest-v102.json", "notes": "Safety: a too-long Bluetooth message could overwrite memory (Wi-Fi setup over Bluetooth), now refused" },
- { "version": 101, "manifest": "manifest-v101.json", "notes": "Classic ESP32: LED outputs 2 to 4 get twice the RMT memory, so Bluetooth and Wi-Fi no longer cause wrong colours on them" },
- { "version": 100, "manifest": "manifest-v100.json", "notes": "Zones are no longer lost when the lights are updated (the update cleared them and the empty layout was saved)" }]
+[{ "version": 103, "manifest": "manifest-v103.json", "notes": "Bluetooth app: the lights now report Color 2 and Color 3, so the app can show and change all three effect colours" },
+ { "version": 102, "manifest": "manifest-v102.json", "notes": "Safety: a too-long Bluetooth message could overwrite memory (Wi-Fi setup over Bluetooth), now refused" },
+ { "version": 101, "manifest": "manifest-v101.json", "notes": "Classic ESP32: LED outputs 2 to 4 get twice the RMT memory, so Bluetooth and Wi-Fi no longer cause wrong colours on them" }]
