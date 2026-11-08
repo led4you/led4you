@@ -744,7 +744,8 @@
 		const big = () => {
 			const cv = h('canvas', { class: 'pvbig', width: '480', height: '480', 'aria-hidden': 'true' });
 			let smp = null, mw = 16, mh = 16;
-			cv.update = spec => { mw = Math.max(1, Math.min(64, spec.mw | 0)); mh = Math.max(1, Math.min(64, spec.mh | 0)); smp = sampler(Object.assign({}, spec, { gw: mw, gh: mh, mx: true })); };
+			let tint = null;   // spec.tint: colour stops every LED is painted with (its brightness kept), so a chosen palette always shows
+			cv.update = spec => { mw = Math.max(1, Math.min(64, spec.mw | 0)); mh = Math.max(1, Math.min(64, spec.mh | 0)); tint = spec.tint || null; smp = sampler(Object.assign({}, spec, { gw: mw, gh: mh, mx: true })); };
 			const loop = now => {
 				if (!cv.isConnected && loop.seen) return;
 				requestAnimationFrame(loop);
@@ -755,7 +756,9 @@
 				const cell = Wc / mw, t = now / 1000, n = mw * mh;
 				g.fillStyle = '#05060a'; g.fillRect(0, 0, Wc, Hc);
 				for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
-					const c = smp(y * mw + x, n, t, mw > 1 ? x / (mw - 1) : 0, mh > 1 ? y / (mh - 1) : 0), r = c[0] | 0, gg = c[1] | 0, b = c[2] | 0, cx = (x + .5) * cell, cy = (y + .5) * cell;
+					let c = smp(y * mw + x, n, t, mw > 1 ? x / (mw - 1) : 0, mh > 1 ? y / (mh - 1) : 0);
+					if (tint) { const v = Math.max(c[0], c[1], c[2]) / 255; c = sc(palAt(tint, (x / mw + y / mh * .35 + t * .06) % 1), v); }
+					const r = c[0] | 0, gg = c[1] | 0, b = c[2] | 0, cx = (x + .5) * cell, cy = (y + .5) * cell;
 					if (Math.max(r, gg, b) < 8) { g.fillStyle = '#14161f'; g.beginPath(); g.arc(cx, cy, cell * .28, 0, 6.283); g.fill(); continue; }
 					g.fillStyle = 'rgba(' + r + ',' + gg + ',' + b + ',.25)'; g.beginPath(); g.arc(cx, cy, cell * .52, 0, 6.283); g.fill();
 					g.fillStyle = 'rgb(' + r + ',' + gg + ',' + b + ')'; g.beginPath(); g.arc(cx, cy, cell * .34, 0, 6.283); g.fill();
@@ -1896,6 +1899,7 @@
 	}
 
 	window.L4YStudio = {
+		pv: PV,   // effect previews (also used by the kids' cube page, show/)
 		textCard,
 		helpify,
 		autoHelp,
