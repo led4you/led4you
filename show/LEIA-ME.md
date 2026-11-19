@@ -2,7 +2,8 @@
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
 escolhem uma imagem animada ou fazem um desenho. Desde a v16 podem também **dar vida à imagem ou ao desenho**
-(saltar, arco-íris, neve, faíscas, corações…), com um nome ou palavra por baixo e a cor do texto e do fundo.
+(saltar, arco-íris, neve, faíscas, corações…), com um nome ou palavra (em baixo, em cima, à esquerda, à direita ou
+por cima), a cor do texto e do fundo, e até 3 imagens lado a lado.
 O pedido aparece logo no lado escolhido e substitui o que lá estava. Cada lado é independente: enquanto um lado
 mostra um texto, os outros recebem outros pedidos. Com a opção "Cada pedido espera que o anterior acabe", os
 pedidos para o mesmo lado esperam pela vez, por ordem de chegada.

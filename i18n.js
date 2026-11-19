@@ -12,6 +12,15 @@
 	const T = [
 		// --- Make a GIF (GIF maker in the Images tab) ---
 		['Make a GIF', 'Criar um GIF', 'Crear un GIF', 'Créer un GIF'],
+		['Second picture (optional)', 'Segundo desenho (opcional)', 'Segundo dibujo (opcional)', 'Deuxième image (facultatif)'],
+		['Third picture (optional)', 'Terceiro desenho (opcional)', 'Tercer dibujo (opcional)', 'Troisième image (facultatif)'],
+		['— none —', '— nenhum —', '— ninguno —', '— aucune —'],
+		['Where the text goes', 'Onde fica o texto', 'Dónde va el texto', 'Où va le texte'],
+		['Below', 'Em baixo', 'Abajo', 'En bas'],
+		['Above', 'Em cima', 'Arriba', 'En haut'],
+		['On the left (letters one under the other)', 'À esquerda (letras umas por baixo das outras)', 'A la izquierda (letras una debajo de otra)', 'À gauche (lettres les unes sous les autres)'],
+		['On the right (letters one under the other)', 'À direita (letras umas por baixo das outras)', 'A la derecha (letras una debajo de otra)', 'À droite (lettres les unes sous les autres)'],
+		['Over the picture', 'Por cima do desenho', 'Encima del dibujo', 'Par-dessus l’image'],
 		['Pick a picture, an animation and, if you like, a short text. The GIF is made on this phone; then send it to the lights.', 'Escolhe um desenho, uma animação e, se quiseres, um texto curto. O GIF é feito neste telemóvel; depois envia-o para as luzes.', 'Elige un dibujo, una animación y, si quieres, un texto corto. El GIF se hace en este móvil; luego envíalo a las luces.', 'Choisissez une image, une animation et, si vous voulez, un court texte. Le GIF est créé sur ce téléphone ; envoyez-le ensuite aux lumières.'],
 		['Picture', 'Desenho', 'Dibujo', 'Image'],
 		['Animation', 'Animação', 'Animación', 'Animation'],

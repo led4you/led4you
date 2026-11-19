@@ -1694,24 +1694,47 @@
 		await im.decode(); g.clearRect(0, 0, N, N); g.drawImage(im, 0, 0, N, N); URL.revokeObjectURL(im.src);
 		return read().px;
 	}
-	// the frames of a made GIF: o = { W, H, sprite: { w, h, px: [[r,g,b] | null] } | null, fx, text, c1: [r,g,b], bg: [r,g,b] }
+	// the frames of a made GIF:
+	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
+	//       c1: [r,g,b], bg: [r,g,b] }   (o.sprite, one picture, still works)
 	function gmFrames(o) {
-		const W = o.W, H = o.H;
-		const BG = o.bg, C1 = o.c1, fx = o.fx, sprite = o.sprite, text = (o.text || '').trim().toUpperCase();
+		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1, fx = o.fx;
+		const sprites = (o.sprites || (o.sprite ? [o.sprite] : [])).filter(Boolean).slice(0, 3);
+		const text = (o.text || '').trim().toUpperCase();
 		const glyphs = Array.from(text).map(ch => F35[ch.normalize('NFD').charAt(0)] || F35['?']);
-		const tScale = !sprite && H >= 12 ? Math.max(1, Math.floor(H / 8)) : 1;  // only text: bigger letters
-		const tw = glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
-		const scroll = tw > W;
-		const ty = sprite ? H - 5 * tScale - (H >= 20 ? 1 : 0) : Math.floor((H - 5 * tScale) / 2);
-		// the picture fits the matrix (whole pixels when it grows); with a text under it, it fits above the text
-		const sw0 = sprite ? sprite.w : 16, sh0 = sprite ? sprite.h : 16, availH = sprite && glyphs.length ? Math.max(6, ty - 1) : H;
-		let sc0 = Math.min(W / sw0, availH / sh0); if (sc0 >= 1) sc0 = Math.floor(sc0);
-		const dw = Math.max(1, Math.round(sw0 * sc0)), dh = Math.max(1, Math.round(sh0 * sc0));
-		const dx0 = Math.floor((W - dw) / 2), dy0 = Math.floor((availH - dh) / 2);
-		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: W + dw, grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
-		if (scroll) N = Math.max(N, tw + W + 2);
+		const has = sprites.length > 0, tpos = glyphs.length ? (o.tpos || 'bottom') : 'none';
+		const vert = tpos === 'left' || tpos === 'right';
+		// text: bigger letters when there is no picture (or it goes over the picture); vertical text = letters one under the other
+		const tScale = (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
+		const tw = vert ? 3 * tScale : glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
+		const th = vert ? (glyphs.length ? glyphs.length * 6 * tScale - tScale : 0) : 5 * tScale;
+		const scroll = vert ? th > H : tw > W;
+		const gap = H >= 20 || W >= 20 ? 1 : 0;
+		let tx = 0, ty = 0, area = { x: 0, y: 0, w: W, h: H };
+		if (tpos === 'bottom') { ty = H - th - gap; if (has) area.h = Math.max(4, ty - 1); }
+		else if (tpos === 'top') { ty = gap; if (has) { area.y = ty + th + 1; area.h = Math.max(4, H - area.y); } }
+		else if (tpos === 'left') { tx = gap; if (has) { area.x = tx + tw + 1; area.w = Math.max(4, W - area.x); } }
+		else if (tpos === 'right') { tx = W - tw - gap; if (has) area.w = Math.max(4, tx - 1); }
+		if (!has && !vert && tpos !== 'none') ty = tpos === 'top' ? gap : tpos === 'bottom' ? H - th - gap : Math.floor((H - th) / 2);
+		if (tpos === 'middle') ty = Math.floor((H - th) / 2);
+		if (vert && !has) tx = tpos === 'left' ? gap : W - tw - gap;
+		if (vert && !scroll) ty = Math.floor((H - th) / 2);
+		if (!vert && !scroll) tx = Math.floor((W - tw) / 2);
+		// each picture in its own cell (side by side, or one under the other in a tall area), fitted with whole pixels when it grows
+		const n = sprites.length, across = area.w >= area.h;
+		const boxes = sprites.map((sp, j) => {
+			const cw = across ? area.w / n : area.w, ch = across ? area.h : area.h / n;
+			let sc = Math.min(cw / sp.w, ch / sp.h); if (sc >= 1) sc = Math.floor(sc);
+			const dw = Math.max(1, Math.round(sp.w * sc)), dh = Math.max(1, Math.round(sp.h * sc));
+			const cx = area.x + (across ? j * cw : 0), cy = area.y + (across ? 0 : j * ch);
+			return { sp, dw, dh, x: Math.floor(cx + (cw - dw) / 2), y: Math.floor(cy + (ch - dh) / 2) };
+		});
+		const groupW = n ? Math.max(...boxes.map(b => b.x + b.dw)) - Math.min(...boxes.map(b => b.x)) : 0;
+		const groupX = n ? Math.min(...boxes.map(b => b.x)) : 0;
+		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: W + groupW, grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
+		if (scroll) N = Math.max(N, (vert ? th + H : tw + W) + 2);
 		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
-		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * (W - 5)), R() * (H + 6)]);
+		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * Math.max(1, W - 5)), R() * (H + 6)]);
 		const frames = [];
 		for (let i = 0; i < N; i++) {
 			const tt = i / N, f = new Array(W * H).fill(null).map(() => BG.slice());
@@ -1720,50 +1743,64 @@
 			if (fx === 'hearts') for (const [x0, y0] of hearts) { const y = Math.floor(H - ((y0 + tt * (H + 6)) % (H + 6))); HEART.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1') put(x0 + rx, y + ry, C1); })); }
 			if (fx === 'sparkle') { const Rf = rnd(100 + i); for (let s = 0; s < Math.round(W * H / 22); s++) { const x = Math.floor(Rf() * W), y = Math.floor(Rf() * H), v = Rf(); put(x, y, C1.map(c => c * (0.35 + 0.65 * v) | 0)); } }
 			const off = fx === 'blink' && i >= N / 2;
-			let dx = 0, dy = 0, sc = 1, mul = 1;
-			if (fx === 'bounce') dy = -Math.round(Math.abs(Math.sin(Math.PI * tt)) * Math.max(1, Math.round(H / 8)));
-			if (fx === 'shake') { const Rs = rnd(30 + i); dx = Math.round(Rs() * 2 - 1); dy = Math.round(Rs() * 2 - 1); }
-			if (fx === 'grow') sc = Math.min(1, 0.15 + 0.85 * Math.min(1, tt / 0.7));
-			if (fx === 'pulse') mul = 0.25 + 0.75 * (0.5 + 0.5 * Math.cos(2 * Math.PI * tt));
-			if (sprite && !off) {
-				if (fx === 'slide') dx = W - dx0 - Math.round(tt * (W + dw));
-				const band = (tt * (W + H + 8)) - 4;
-				for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
+			const motion = (ph, seed) => {   // ph: 0..1 phase of this picture (pictures side by side take turns)
+				let dx = 0, dy = 0, sc = 1, mul = 1;
+				if (fx === 'bounce') dy = -Math.round(Math.abs(Math.sin(Math.PI * ph)) * Math.max(1, Math.round(H / 8)));
+				if (fx === 'shake') { const Rs = rnd(30 + i + seed * 97); dx = Math.round(Rs() * 2 - 1); dy = Math.round(Rs() * 2 - 1); }
+				if (fx === 'grow') sc = Math.min(1, 0.15 + 0.85 * Math.min(1, tt / 0.7));
+				if (fx === 'pulse') mul = 0.25 + 0.75 * (0.5 + 0.5 * Math.cos(2 * Math.PI * ph));
+				return { dx, dy, sc, mul };
+			};
+			if (!off) boxes.forEach((b, j) => {
+				const ph = (tt + (n > 1 && (fx === 'bounce' || fx === 'pulse') ? j / n : 0)) % 1;
+				let { dx, dy, sc, mul } = motion(ph, j);
+				if (fx === 'slide') dx = W - groupX - Math.round(tt * (W + groupW));
+				const band = (tt * (W + H + 8)) - 4, sp = b.sp;
+				for (let y = 0; y < b.dh; y++) for (let x = 0; x < b.dw; x++) {
 					let sxp = x, syp = y;
-					if (sc < 1) { sxp = Math.floor((x - dw / 2) / sc + dw / 2); syp = Math.floor((y - dh / 2) / sc + dh / 2); if (sxp < 0 || syp < 0 || sxp >= dw || syp >= dh) continue; }
-					let c = sprite.px[Math.floor(syp * sh0 / dh) * sw0 + Math.floor(sxp * sw0 / dw)];
+					if (sc < 1) { sxp = Math.floor((x - b.dw / 2) / sc + b.dw / 2); syp = Math.floor((y - b.dh / 2) / sc + b.dh / 2); if (sxp < 0 || syp < 0 || sxp >= b.dw || syp >= b.dh) continue; }
+					let c = sp.px[Math.floor(syp * sp.h / b.dh) * sp.w + Math.floor(sxp * sp.w / b.dw)];
 					if (!c) continue;
-					if (fx === 'rainbow') { const [hh, s, v] = rgb2hsv(c); c = hsv2rgb((hh + tt) % 1, Math.max(s, 0.6), Math.max(v, 0.6)); }
-					if (fx === 'shine') { const d = Math.abs((dx0 + x) + (dy0 + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
+					if (fx === 'rainbow') { const [hh, s, v] = rgb2hsv(c); c = hsv2rgb((hh + tt + j / 4) % 1, Math.max(s, 0.6), Math.max(v, 0.6)); }
+					if (fx === 'shine') { const d = Math.abs((b.x + x) + (b.y + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
 					if (mul !== 1) c = c.map(v => v * mul | 0);
-					put(dx0 + x + dx, dy0 + y + dy, c);
+					put(b.x + x + dx, b.y + y + dy, c);
 				}
-			}
+			});
 			if (glyphs.length && !off) {
-				// with no picture the text itself bounces, shakes or pulses
-				const tdx = sprite ? 0 : dx, tdy = sprite ? 0 : dy, tm = sprite ? 1 : mul;
-				const x0 = (scroll ? W - Math.round(i * (tw + W) / N) : Math.floor((W - tw) / 2)) + tdx;
-				const tc = gi => (fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : C1).map(v => v * tm | 0);
-				glyphs.forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
-					for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) put(x0 + (gi * 4 + gx) * tScale + a, ty + tdy + gy * tScale + b2, tc(gi)); });
+				// with no picture (or text over it) the text itself bounces, shakes or pulses
+				const m = has && tpos !== 'middle' ? { dx: 0, dy: 0, mul: 1 } : motion(tt, 9);
+				const x0 = (scroll && !vert ? W - Math.round(i * (tw + W) / N) : tx) + m.dx;
+				const y0 = (scroll && vert ? H - Math.round(i * (th + H) / N) : ty) + m.dy;
+				const tc = gi => (fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : C1).map(v => v * m.mul | 0);
+				glyphs.forEach((gl, gi) => {
+					const gx0 = vert ? x0 : x0 + gi * 4 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
+					for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
+						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) put(gx0 + gx * tScale + a, gy0 + gy * tScale + b2, tc(gi));
+				});
 			}
 			frames.push(f);
 		}
 		return frames;
 	}
 	function gifMakerCard(t, toast, base) {
-		let o = { pic: 'hw-pumpkin.gif', fx: 'bounce', txt: '', c1: '#ffd23f', bg: '#000000', spd: 90, size: 0, name: '' };
+		let o = { pic: 'hw-pumpkin.gif', pic2: '', pic3: '', tpos: 'bottom', fx: 'bounce', txt: '', c1: '#ffd23f', bg: '#000000', spd: 90, size: 0, name: '' };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yGifMaker') || '{}')); } catch (e) {}
 		let draw = null;
 		try { draw = JSON.parse(localStorage.getItem('l4yGifDraw') || 'null'); } catch (e) {}
 		if (!Array.isArray(draw) || draw.length !== 256) draw = new Array(256).fill(null);
 		const save = () => { try { localStorage.setItem('l4yGifMaker', JSON.stringify(o)); localStorage.setItem('l4yGifDraw', JSON.stringify(draw)); } catch (e) {} };
-		let sprite = null, frames = [], W = 16, H = 16, delay = 90, bytes = null;
+		let sprites = [], frames = [], W = 16, H = 16, delay = 90, bytes = null;
+		const spCache = {};
 		const inf = t.info();
 		const sizes = [[16, 16]];
 		if (inf.mw && inf.mh && inf.mw <= 64 && inf.mh <= 64 && !(inf.mw === 16 && inf.mh === 16)) sizes.push([inf.mw, inf.mh]);
 		if (!sizes.some(s => s[0] === 32 && s[1] === 32)) sizes.push([32, 32]);
 		const picSel = h('select', { 'aria-label': 'Picture' }, h('option', { value: '' }, 'No picture (only text and effect)'), h('option', { value: '*draw' }, 'My drawing'));
+		// v90: up to 3 pictures side by side (a candy cane and a tree…)
+		const pic2Sel = h('select', { 'aria-label': 'Second picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
+		const pic3Sel = h('select', { 'aria-label': 'Third picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
+		const tposSel = h('select', { 'aria-label': 'Where the text goes' }, [['bottom', 'Below'], ['top', 'Above'], ['left', 'On the left (letters one under the other)'], ['right', 'On the right (letters one under the other)'], ['middle', 'Over the picture']].map(([v, n]) => h('option', { value: v }, n)));
 		const fxSel = h('select', { 'aria-label': 'Animation' }, GM_FX.map(([v, n]) => h('option', { value: v }, n)));
 		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (i === 1 && sizes.length > 2 ? ' (your matrix)' : ''))));
 		const txt = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'Optional: a short text', value: o.txt || '' });
@@ -1785,13 +1822,13 @@
 			for (let i = 0; i < 256; i++) { const x = i % 16, y = i >> 4; g.fillStyle = draw[i] || '#1b1f2b'; g.fillRect(x * c + 1, y * c + 1, c - 2, c - 2); } };
 		let painting = false;
 		const paintAt = e => { const r = dcv.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * 16), y = Math.floor((e.clientY - r.top) / r.height * 16);
-			if (x < 0 || y < 0 || x > 15 || y > 15) return; const v = erase ? null : brush.value; if (draw[y * 16 + x] === v) return; draw[y * 16 + x] = v; drawGrid(); if (o.pic === '*draw') { sprite = draw.map(c => c ? hexToRgb(c) : null); build(); } };
+			if (x < 0 || y < 0 || x > 15 || y > 15) return; const v = erase ? null : brush.value; if (draw[y * 16 + x] === v) return; draw[y * 16 + x] = v; drawGrid(); if ([picSel, pic2Sel, pic3Sel].some(x => x.value === '*draw')) setPic(); };
 		dcv.onpointerdown = e => { painting = true; dcv.setPointerCapture(e.pointerId); paintAt(e); };
 		dcv.onpointermove = e => { if (painting) paintAt(e); };
 		dcv.onpointerup = dcv.onpointercancel = () => { if (painting) { painting = false; save(); } };
 		eraseBtn.onclick = () => { erase = !erase; eraseBtn.classList.toggle('sel', erase); };
 		const clearBtn = h('button', { type: 'button', class: 'btn small' }, 'Clear');
-		clearBtn.onclick = () => { draw.fill(null); drawGrid(); save(); if (o.pic === '*draw') { sprite = draw.map(() => null); build(); } };
+		clearBtn.onclick = () => { draw.fill(null); drawGrid(); save(); if ([picSel, pic2Sel, pic3Sel].some(x => x.value === '*draw')) setPic(); };
 		const copyBtn = h('button', { type: 'button', class: 'btn small' }, 'Start from a pack picture');
 		const drawBox = h('details', { class: 'more' }, h('summary', {}, 'My drawing'),
 			h('div', { class: 'note' }, 'Draw your own 16×16 picture. Choose "My drawing" as the picture to animate it.'),
@@ -1801,19 +1838,23 @@
 		const build = () => {
 			[W, H] = sizes[+sizeSel.value] || sizes[0];
 			delay = +spd.value;
-			frames = gmFrames({ W, H, sprite: sprite && { w: 16, h: 16, px: sprite }, fx: fxSel.value, text: txt.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
+			frames = gmFrames({ W, H, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
 			const fx = fxSel.value;
 			bytes = gifEncode(frames, W, H, delay);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
-			o = { pic: picSel.value, fx, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
+			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
 			save();
 		};
 		const setPic = async () => {
-			const v = picSel.value;
-			if (!v) sprite = null;
-			else if (v === '*draw') sprite = draw.map(c => c ? hexToRgb(c) : null);
-			else { info.textContent = 'Loading the picture…'; try { sprite = await gmLoadSprite(base + v); } catch (e) { sprite = null; info.textContent = 'The picture needs internet on this phone.'; } }
+			const out = [];
+			for (const v of [picSel.value, pic2Sel.value, pic3Sel.value]) {
+				if (!v) continue;
+				if (v === '*draw') { out.push(draw.map(c => c ? hexToRgb(c) : null)); continue; }
+				if (!spCache[v]) { info.textContent = 'Loading the picture…'; try { spCache[v] = await gmLoadSprite(base + v); } catch (e) { info.textContent = 'The picture needs internet on this phone.'; continue; } }
+				out.push(spCache[v]);
+			}
+			sprites = out;
 			build();
 		};
 		copyBtn.onclick = async () => {
@@ -1862,17 +1903,20 @@
 			const a = h('a', { href: URL.createObjectURL(new Blob([bytes], { type: 'image/gif' })), download: fileName() });
 			document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 		};
-		[fxSel, sizeSel, c1, bg].forEach(el => el.oninput = el.onchange = build);
+		[fxSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
+		pic2Sel.onchange = pic3Sel.onchange = setPic;
 		spd.addEventListener('input', build);
 		txt.oninput = build;
 		nameIn.oninput = () => { o.name = nameIn.value; save(); };
 		picSel.onchange = setPic;
 		fxSel.value = o.fx; if (!fxSel.value) fxSel.value = 'bounce';
 		sizeSel.value = String(Math.min(o.size || 0, sizes.length - 1));
+		tposSel.value = o.tpos || 'bottom';
 		drawGrid();
 		fetch(base + 'pack.json').then(r => r.json()).then(pack => {
-			[...new Set(pack.map(f => f.t))].forEach(th => picSel.append(h('optgroup', { label: th }, pack.filter(f => f.t === th).map(f => h('option', { value: f.f }, f.n)))));
+			for (const sel of [picSel, pic2Sel, pic3Sel]) [...new Set(pack.map(f => f.t))].forEach(th => sel.append(h('optgroup', { label: th }, pack.filter(f => f.t === th).map(f => h('option', { value: f.f }, f.n)))));
 			picSel.value = o.pic; if (picSel.value !== o.pic) picSel.value = o.pic === '' ? '' : 'hw-pumpkin.gif';
+			pic2Sel.value = o.pic2 || ''; pic3Sel.value = o.pic3 || '';
 			setPic();
 		}).catch(() => { picSel.value = o.pic === '*draw' ? '*draw' : ''; setPic(); });
 		return h('section', { class: 'card' },
@@ -1880,8 +1924,11 @@
 			h('div', { class: 'note' }, 'Pick a picture, an animation and, if you like, a short text. The GIF is made on this phone; then send it to the lights.'),
 			targetBar(t),
 			h('label', { class: 'fld' }, h('span', {}, 'Picture'), picSel),
+			h('label', { class: 'fld' }, h('span', {}, 'Second picture (optional)'), pic2Sel),
+			h('label', { class: 'fld' }, h('span', {}, 'Third picture (optional)'), pic3Sel),
 			h('label', { class: 'fld' }, h('span', {}, 'Animation'), fxSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Text'), txt),
+			h('label', { class: 'fld' }, h('span', {}, 'Where the text goes'), tposSel),
 			h('div', { class: 'rowc' }, h('label', { class: 'gmcol' }, c1, h('span', {}, 'Text / effect')), h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background'))),
 			h('div', { class: 'lab sp' }, 'Speed (time per frame)'), spd,
 			h('label', { class: 'fld' }, h('span', {}, 'Size'), sizeSel),

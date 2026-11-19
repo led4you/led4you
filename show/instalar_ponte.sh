@@ -311,7 +311,7 @@ def check(msg, allow_free=False, att=None):
         fx = str(m.get("fx", ""))
         if fx not in GIFX_FX:
             return None
-        src = str(m.get("src", ""))[:30]
+        src = str(m.get("src", ""))[:80]
         key = "t" if z == -1 else str(z)
         return "gifx", segs({"fx": FX_IMAGE, "n": "", "sx": 128, "ix": 0, "c3": 0, "frz": False}), \
             {"url": url, "w": w, "h": h, "key": key, "fx": fx, "t": t, "src": src, "where": where}
