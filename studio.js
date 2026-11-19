@@ -1824,8 +1824,9 @@
 				return { dx, dy, sc, mul };
 			};
 			if (!off) boxes.forEach((b, j) => {
-				const ph = (tt + (n > 1 && (fx === 'bounce' || fx === 'pulse') ? j / n : 0)) % 1;
-				let { dx, dy, sc, mul } = motion(ph, j);
+				// v97: pictures move together; o.turns = they take turns (bounce, pulse, shake)
+				const ph = (tt + (o.turns && n > 1 && (fx === 'bounce' || fx === 'pulse') ? j / n : 0)) % 1;
+				let { dx, dy, sc, mul } = motion(ph, o.turns ? j : 0);
 				if (fx === 'slide') dx = W - groupX - Math.round(tt * (W + groupW));
 				const band = (tt * (W + H + 8)) - 4, sp = b.sp, cur = frameAt(sp.px, msAt(i));
 				for (let y = 0; y < b.dh; y++) for (let x = 0; x < b.dw; x++) {

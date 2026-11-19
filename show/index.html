@@ -135,7 +135,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=23"></script>
+<script src="../studio.js?v=24"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -364,18 +364,20 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		['fire', '🔥 Chamas'], ['bats', '🦇 Morcegos'], ['sparkle', '🎇 Faíscas']];
 	const SPEEDS = [['Devagar', 160], ['Normal', 90], ['Rápido', 50]];
 	const animBox = (box, kind) => {
-		const a = { fx: 'orig', bgfx: '', fit: 'fit', tpos: 'bottom', sprites: [], txt: '', c1: URL_THEME === 'xm' ? 4 : 3, bg: 0, spd: 90, frames: [], bytes: null, sprite: null, key: '' };
+		const a = { fx: 'orig', bgfx: '', fit: 'fit', turns: false, tpos: 'bottom', sprites: [], txt: '', c1: URL_THEME === 'xm' ? 4 : 3, bg: 0, spd: 90, frames: [], bytes: null, sprite: null, key: '' };
 		if (!GM) { box.hidden = true; return a; }
 		const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
-		const chips = mk('div', 'chips'), bgR = mk('div', 'chips'), fitR = mk('div', 'chips'), tposR = mk('div', 'chips'), spd = mk('div', 'chips'), c1 = mk('div', 'swatches'), bg = mk('div', 'swatches');
+		const chips = mk('div', 'chips'), bgR = mk('div', 'chips'), fitR = mk('div', 'chips'), turnR = mk('div', 'chips'), turnLab = mk('div', 'lab', 'As imagens mexem'), tposR = mk('div', 'chips'), spd = mk('div', 'chips'), c1 = mk('div', 'swatches'), bg = mk('div', 'swatches');
 		const txt = mk('input'); txt.type = 'text'; txt.maxLength = 20; txt.autocomplete = 'off'; txt.placeholder = 'Um nome ou palavra (opcional)';
 		const cv = mk('canvas'), info = mk('p', 'note ainfo'), pvw = mk('div', 'apv'); pvw.append(cv);
 		const chipRow = (row, list, cur, on) => row.replaceChildren(...list.map(([v, n]) => { const b = mk('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); return b; }));
 		const drawChips = () => { chipRow(chips, ANIMS, a.fx, v => { a.fx = v; drawChips(); a.build(); });
 			chipRow(bgR, BGS, a.bgfx, v => { a.bgfx = v; drawChips(); a.build(); });
+			chipRow(turnR, [[false, '👯 Ao mesmo tempo'], [true, '🔁 À vez']], a.turns, v => { a.turns = v; drawChips(); a.build(); });
+			turnLab.hidden = turnR.hidden = kind !== 'gif' || gifs3.length < 2;
 			chipRow(fitR, [['fit', '🖼️ Na proporção'], ['stretch', '↔️ Esticar'], ['fill', '🔲 Encher (corta as pontas)']], a.fit, v => { a.fit = v; drawChips(); a.build(); });
 			chipRow(tposR, [['bottom', '⬇️ Em baixo'], ['top', '⬆️ Em cima'], ['left', '⬅️ À esquerda'], ['right', '➡️ À direita'], ['middle', '🎯 Por cima']], a.tpos, v => { a.tpos = v; drawChips(); a.build(); }); chipRow(spd, SPEEDS.map(([n, ms]) => [ms, n]), a.spd, v => { a.spd = v; drawChips(); a.build(); }); };
-		box.append(mk('div', 'lab', 'Dá vida ' + (kind === 'draw' ? 'ao teu desenho' : 'à imagem')), chips, mk('div', 'lab', 'Efeito de fundo'), bgR, mk('div', 'lab', 'Tamanho ' + (kind === 'draw' ? 'do desenho' : 'da imagem')), fitR, mk('label', 'lab', 'Escreve um nome ou uma palavra (opcional)'), txt, mk('div', 'lab', 'Onde fica o texto'), tposR,
+		box.append(mk('div', 'lab', 'Dá vida ' + (kind === 'draw' ? 'ao teu desenho' : 'à imagem')), chips, mk('div', 'lab', 'Efeito de fundo'), bgR, mk('div', 'lab', 'Tamanho ' + (kind === 'draw' ? 'do desenho' : 'da imagem')), fitR, turnLab, turnR, mk('label', 'lab', 'Escreve um nome ou uma palavra (opcional)'), txt, mk('div', 'lab', 'Onde fica o texto'), tposR,
 			mk('div', 'lab', 'Cor do texto e do efeito'), c1, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw, info);
 		swatches(c1, [1, 2, 3, 4, 5, 6, 7, 8], a.c1, i => { a.c1 = i; a.build(); });
 		swatches(bg, [0, 1, 2, 3, 4, 5, 6, 7, 8], a.bg, i => { a.bg = i; a.build(); });
@@ -386,6 +388,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		// one picture "as it is" keeps its own animation even stretched or filling: the lights stretch it (no GIF made here)
 		a.made = () => !isText() && (a.fx !== 'orig' || a.bgfx !== '' || (kind === 'draw' && a.fit !== 'fit') || a.txt.trim() !== '' || a.bg !== 0 || (kind === 'gif' && gifs3.length > 1));
 		a.build = () => {
+			turnLab.hidden = turnR.hidden = kind !== 'gif' || gifs3.length < 2;
 			const [w, h] = sizeNow();
 			const sp = a.sprites.length ? a.sprites : null;
 			info.textContent = ''; a.bytes = null; a.frames = [];
@@ -394,7 +397,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			if (isText()) { info.textContent = 'Esta imagem já é um texto: aparece sozinha e como está. Para pôr o teu texto, escolhe outra imagem e escreve-o aqui.'; return; }
 			if (pvw.hidden) { info.textContent = kind === 'gif' && a.fx === 'orig' && !a.bgfx && gifs3.length < 2 ? 'Como está: a imagem aparece com a animação dela.' : ''; return; }
 			if (a.txt.trim() && isBad(a.txt)) { info.textContent = 'Essa palavra não pode aparecer. Escolhe outra!'; return; }
-			a.frames = GM.frames({ W: w, H: h, delay: a.spd, sprites: a.sprites, fx: a.fx === 'orig' ? 'still' : a.fx, bgfx: a.bgfx, fit: a.fit, text: a.txt, tpos: a.tpos, c1: rgb(a.c1), bg: rgb(a.bg) });
+			a.frames = GM.frames({ W: w, H: h, delay: a.spd, sprites: a.sprites, fx: a.fx === 'orig' ? 'still' : a.fx, bgfx: a.bgfx, fit: a.fit, turns: a.turns, text: a.txt, tpos: a.tpos, c1: rgb(a.c1), bg: rgb(a.bg) });
 			a.bytes = GM.encode(a.frames, w, h, a.spd);
 			if (a.bytes.length > 60000) { info.textContent = 'Fica grande demais para as luzes. Escolhe outra animação ou um texto mais curto.'; a.bytes = null; }
 		};
