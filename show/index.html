@@ -96,7 +96,9 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   </section>
 
   <section class="card" id="pGif" hidden>
-    <div class="lab">Escolhe uma imagem (ou até 3, para ficarem lado a lado)</div>
+    <div class="lab">Escolhe uma imagem</div>
+    <div class="chips"><button type="button" class="chip" id="multi" aria-pressed="false">➕ Juntar várias imagens (até 3)</button></div>
+    <div class="chips" id="picked" hidden></div>
     <div class="gifs" id="gifs"></div>
     <div class="anim" id="gifAnim"></div>
   </section>
@@ -292,24 +294,41 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	// ---- pictures (the LED4YOU GIF pack) ----
 	let gif = null, pack = [], gifs3 = [];   // v16b: up to 3 pictures, in the order they were tapped (gif = the first one)
 	const drawGifs = () => {
+		if (typeof drawPicked === 'function') drawPicked();
 		const list = pack.filter(f => !cfg.theme || f.f.startsWith(cfg.theme + '-'));
 		$('gifs').replaceChildren(...list.map(f => {
-			const at = gifs3.indexOf(f.f);
+			const at = gifs3.indexOf(f.f), times = gifs3.filter(g => g === f.f).length;
 			const b = document.createElement('button'); b.type = 'button'; b.className = 'gif'; b.setAttribute('aria-pressed', String(at >= 0));
 			const im = document.createElement('img'); im.src = '../gifs/' + f.f; im.alt = '';
 			const s = document.createElement('span'); s.textContent = PT[f.n] || f.n;
 			b.append(im, s);
-			if (at >= 0 && gifs3.length > 1) { const nb = document.createElement('b'); nb.textContent = at + 1; b.append(nb); }
+			if (times > 1) { const nb = document.createElement('b'); nb.textContent = '×' + times; b.append(nb); }
 			b.onclick = () => {
 				// pictures that are a text (Feliz Natal, Boas festas…) go alone and as they are
 				const TX = (window.L4YStudio && L4YStudio.gm && L4YStudio.gm.TEXTGIF) || new Set();
-				if (at >= 0) gifs3.splice(at, 1);
-				else if (TX.has(f.f)) gifs3 = [f.f];
-				else { gifs3 = gifs3.filter(g => !TX.has(g)); if (gifs3.length >= 3) gifs3.shift(); gifs3.push(f.f); }
+				if (!multi || TX.has(f.f)) gifs3 = [f.f];
+				else { gifs3 = gifs3.filter(g => !TX.has(g)); if (gifs3.length >= 3) gifs3.shift(); gifs3.push(f.f); }   // the same picture can go 2 or 3 times
 				gif = gifs3[0] || null; drawGifs(); loadGifSprite();
 			};
 			return b;
 		}));
+	};
+	// v16c: "join several pictures": each tap adds one (the same one too), the chosen ones show above with ✕ to take one out
+	let multi = false;
+	const drawPicked = () => {
+		$('picked').hidden = !multi || !gifs3.length;
+		$('picked').replaceChildren(...gifs3.map((g, i) => {
+			const f = pack.find(x => x.f === g) || { n: g };
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = (i + 1) + '. ' + (PT[f.n] || f.n) + ' ✕';
+			b.setAttribute('aria-label', 'Tirar ' + (PT[f.n] || f.n));
+			b.onclick = () => { gifs3.splice(i, 1); gif = gifs3[0] || null; drawGifs(); loadGifSprite(); };
+			return b;
+		}));
+	};
+	$('multi').onclick = () => {
+		multi = !multi; $('multi').setAttribute('aria-pressed', String(multi));
+		if (!multi && gifs3.length > 1) gifs3 = gifs3.slice(0, 1);
+		gif = gifs3[0] || null; drawGifs(); loadGifSprite();
 	};
 	fetch('../gifs/pack.json').then(r => r.json()).then(p => { pack = p; drawGifs(); }).catch(() => { $('gifs').textContent = 'As imagens não carregaram. Tenta outra vez.'; });
 
