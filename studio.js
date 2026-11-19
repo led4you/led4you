@@ -1688,12 +1688,16 @@
 				await dec.tracks.ready;
 				const n = Math.min(dec.tracks.selectedTrack.frameCount || 1, 60);
 				let best = null;
+				const frames = [], delays = [];
 				for (let i = 0; i < n; i++) {
 					const { image } = await dec.decode({ frameIndex: i });
-					g.clearRect(0, 0, N, N); g.drawImage(image, 0, 0, N, N); image.close();
-					const r = read(); if (!best || r.lit > best.lit) best = r;
+					g.clearRect(0, 0, N, N); g.drawImage(image, 0, 0, N, N);
+					delays.push(Math.max(20, Math.round((image.duration || 100000) / 1000)));   // µs -> ms
+					image.close();
+					const r = read(); frames.push(r.px); if (!best || r.lit > best.lit) best = r;
 				}
-				if (best) return best.px;
+				// v96: the picture keeps its own animation in the GIFs made from it (px = its fullest frame, px.anim = all of them)
+				if (best) { const px = best.px.slice(); if (frames.length > 1) px.anim = { frames, delays, total: delays.reduce((a, b) => a + b, 0) }; return px; }
 			} catch (e) {}
 		}
 		const im = new Image(); im.src = URL.createObjectURL(blob);
@@ -1704,7 +1708,7 @@
 	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, text2 (a 2nd line at the bottom, colour c2), dir1 / dir2 ('left' | 'right': where each line goes), tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
 	//       c1: [r,g,b], bg: [r,g,b] }   (o.sprite, one picture, still works)
 	function gmFrames(o) {
-		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1;
+		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1, delay = o.delay || 90;
 		// the old single list had the backgrounds among the movements: they still work
 		let fx = o.fx, bgfx = o.bgfx || '';
 		if (['snow', 'sparkle', 'hearts'].includes(fx)) { bgfx = bgfx || fx; fx = 'still'; }
@@ -1745,11 +1749,21 @@
 		// stretching or filling: the empty border around the picture is cut first, so the picture itself fills its place
 		const trim = sp => {
 			let x0 = sp.w, y0 = sp.h, x1 = -1, y1 = -1;
-			sp.px.forEach((c, i) => { if (c) { const x = i % sp.w, y = Math.floor(i / sp.w); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } });
+			const all = sp.px.anim ? sp.px.anim.frames : [sp.px];
+			all.forEach(fr => fr.forEach((c, i) => { if (c) { const x = i % sp.w, y = Math.floor(i / sp.w); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } }));
 			if (x1 < 0) return sp;
-			const w = x1 - x0 + 1, hh = y1 - y0 + 1, px = [];
-			for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) px.push(sp.px[(y0 + y) * sp.w + x0 + x]);
+			const w = x1 - x0 + 1, hh = y1 - y0 + 1;
+			const cut = fr => { const px = []; for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) px.push(fr[(y0 + y) * sp.w + x0 + x]); return px; };
+			const px = cut(sp.px);
+			if (sp.px.anim) px.anim = Object.assign({}, sp.px.anim, { frames: sp.px.anim.frames.map(cut) });
 			return { w, h: hh, px };
+		};
+		// the frame of an animated picture at a given time (ms), from its own frame times
+		const frameAt = (px, ms) => {
+			const a = px.anim; if (!a) return px;
+			let t = ms % a.total;
+			for (let k = 0; k < a.frames.length; k++) { if (t < a.delays[k]) return a.frames[k]; t -= a.delays[k]; }
+			return a.frames[a.frames.length - 1];
 		};
 		const boxes = sprites.map((sp0, j) => {
 			const sp = (o.fit || 'fit') === 'fit' ? sp0 : trim(sp0);
@@ -1770,6 +1784,11 @@
 		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: n ? W + groupW : vert ? H + th : W + Math.max(tw, tw2), grow: 20, shine: 24 }[fx] || 16;
 		const bgN = { snow: H * 2, stars: 24, confetti: H * 2, fireworks: 32, hearts: H + 6, fire: 16, bats: W + 6, sparkle: 16 }[bgfx] || 0;
 		if (bgN) N = N <= 1 ? bgN : Math.max(N, bgN);
+		// animated pictures: at least one full run of their own animation (at most 64 frames)
+		const animMs = Math.max(0, ...boxes.map(b => b.sp.px.anim ? b.sp.px.anim.total : 0));
+		const N0 = animMs ? Math.max(2, Math.round(animMs / delay)) : 0;
+		if (animMs) N = Math.min(64, Math.max(N, N0));
+		const msAt = i => N === N0 ? i * animMs / N0 : i * delay;   // when the GIF is exactly one run of the animation, it loops without a jump
 		if (scroll) N = Math.max(N, (vert ? th + H : tw + W) + 2);
 		if (scroll2) N = Math.max(N, tw2 + W + 2);
 		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
@@ -1808,11 +1827,11 @@
 				const ph = (tt + (n > 1 && (fx === 'bounce' || fx === 'pulse') ? j / n : 0)) % 1;
 				let { dx, dy, sc, mul } = motion(ph, j);
 				if (fx === 'slide') dx = W - groupX - Math.round(tt * (W + groupW));
-				const band = (tt * (W + H + 8)) - 4, sp = b.sp;
+				const band = (tt * (W + H + 8)) - 4, sp = b.sp, cur = frameAt(sp.px, msAt(i));
 				for (let y = 0; y < b.dh; y++) for (let x = 0; x < b.dw; x++) {
 					let sxp = x, syp = y;
 					if (sc < 1) { sxp = Math.floor((x - b.dw / 2) / sc + b.dw / 2); syp = Math.floor((y - b.dh / 2) / sc + b.dh / 2); if (sxp < 0 || syp < 0 || sxp >= b.dw || syp >= b.dh) continue; }
-					let c = sp.px[Math.floor(syp * sp.h / b.dh) * sp.w + Math.floor(sxp * sp.w / b.dw)];
+					let c = cur[Math.floor(syp * sp.h / b.dh) * sp.w + Math.floor(sxp * sp.w / b.dw)];
 					if (!c) continue;
 					if (fx === 'rainbow') { const [hh, s, v] = rgb2hsv(c); c = hsv2rgb((hh + tt + j / 4) % 1, Math.max(s, 0.6), Math.max(v, 0.6)); }
 					if (fx === 'shine') { const d = Math.abs((b.x + x) + (b.y + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
@@ -1914,7 +1933,7 @@
 		const build = () => {
 			[W, H] = sizes[+sizeSel.value] || sizes[0];
 			delay = +spd.value;
-			frames = gmFrames({ W, H, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, fit: pfitSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
+			frames = gmFrames({ W, H, delay, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, fit: pfitSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
 			const fx = fxSel.value;
 			bytes = gifEncode(frames, W, H, delay);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');

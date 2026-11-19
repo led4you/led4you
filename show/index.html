@@ -135,7 +135,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=22"></script>
+<script src="../studio.js?v=23"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -394,7 +394,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			if (isText()) { info.textContent = 'Esta imagem já é um texto: aparece sozinha e como está. Para pôr o teu texto, escolhe outra imagem e escreve-o aqui.'; return; }
 			if (pvw.hidden) { info.textContent = kind === 'gif' && a.fx === 'orig' && !a.bgfx && gifs3.length < 2 ? 'Como está: a imagem aparece com a animação dela.' : ''; return; }
 			if (a.txt.trim() && isBad(a.txt)) { info.textContent = 'Essa palavra não pode aparecer. Escolhe outra!'; return; }
-			a.frames = GM.frames({ W: w, H: h, sprites: a.sprites, fx: a.fx === 'orig' ? 'still' : a.fx, bgfx: a.bgfx, fit: a.fit, text: a.txt, tpos: a.tpos, c1: rgb(a.c1), bg: rgb(a.bg) });
+			a.frames = GM.frames({ W: w, H: h, delay: a.spd, sprites: a.sprites, fx: a.fx === 'orig' ? 'still' : a.fx, bgfx: a.bgfx, fit: a.fit, text: a.txt, tpos: a.tpos, c1: rgb(a.c1), bg: rgb(a.bg) });
 			a.bytes = GM.encode(a.frames, w, h, a.spd);
 			if (a.bytes.length > 60000) { info.textContent = 'Fica grande demais para as luzes. Escolhe outra animação ou um texto mais curto.'; a.bytes = null; }
 		};
@@ -454,7 +454,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			if (!t1 && !l2) { info.textContent = 'Escreve ou escolhe uma mensagem.'; return; }
 			if (isBad(t1) || (l2 && isBad(l2))) { info.textContent = 'Essa mensagem não pode aparecer. Escolhe outra!'; return; }
 			const [w, h] = sizeNow();
-			txtS.frames = GM.frames({ W: w, H: h, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, bgfx: txtS.bgfx, c1: rgb(txtCol), c2: rgb(txtS.c2), dir1: txtS.d1, dir2: txtS.d2, bg: rgb(txtS.bg) });
+			txtS.frames = GM.frames({ W: w, H: h, delay: txtS.spd, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, bgfx: txtS.bgfx, c1: rgb(txtCol), c2: rgb(txtS.c2), dir1: txtS.d1, dir2: txtS.d2, bg: rgb(txtS.bg) });
 			txtS.bytes = GM.encode(txtS.frames, w, h, txtS.spd);
 			if (txtS.bytes.length > 60000) { info.textContent = 'Fica grande demais para as luzes. Escolhe um texto mais curto.'; txtS.bytes = null; }
 		};
