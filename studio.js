@@ -1667,6 +1667,8 @@
 	const hsv2rgb = (hh, s, v) => { const i = Math.floor(hh * 6), f = hh * 6 - i, p = v * (1 - s), q = v * (1 - f * s), u = v * (1 - (1 - f) * s);
 		const [r, g, b] = [[v, u, p], [q, v, p], [p, v, u], [p, q, v], [u, p, v], [v, p, q]][((i % 6) + 6) % 6]; return [r * 255 | 0, g * 255 | 0, b * 255 | 0]; };
 	const rnd = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let x = Math.imul(seed ^ seed >>> 15, 1 | seed); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+	// pack GIFs that are a scrolling text: one frame of them is half a word, so they are not used as pictures to animate
+	const GM_TEXTGIF = new Set(['hw-boo.gif', 'hw-doces.gif', 'xm-hohoho.gif', 'xm-feliznatal.gif', 'xm-boasfestas.gif', 'ev-parabens.gif']);
 	const HEART = ['01010', '11111', '11111', '01110', '00100'];
 	// the picture of a GIF from the pack: the frame with the most lit LEDs (ImageDecoder where the browser has it, else the first frame)
 	async function gmLoadSprite(url) {
@@ -1914,7 +1916,7 @@
 		tposSel.value = o.tpos || 'bottom';
 		drawGrid();
 		fetch(base + 'pack.json').then(r => r.json()).then(pack => {
-			for (const sel of [picSel, pic2Sel, pic3Sel]) [...new Set(pack.map(f => f.t))].forEach(th => sel.append(h('optgroup', { label: th }, pack.filter(f => f.t === th).map(f => h('option', { value: f.f }, f.n)))));
+			for (const sel of [picSel, pic2Sel, pic3Sel]) [...new Set(pack.map(f => f.t))].forEach(th => sel.append(h('optgroup', { label: th }, pack.filter(f => f.t === th && !GM_TEXTGIF.has(f.f)).map(f => h('option', { value: f.f }, f.n)))));
 			picSel.value = o.pic; if (picSel.value !== o.pic) picSel.value = o.pic === '' ? '' : 'hw-pumpkin.gif';
 			pic2Sel.value = o.pic2 || ''; pic3Sel.value = o.pic3 || '';
 			setPic();
@@ -2232,7 +2234,7 @@
 		extrasCards,
 		gifPackCard,
 		gifMakerCard,
-		gm: { encode: gifEncode, frames: gmFrames, loadSprite: gmLoadSprite, FX: GM_FX },
+		gm: { encode: gifEncode, frames: gmFrames, loadSprite: gmLoadSprite, FX: GM_FX, TEXTGIF: GM_TEXTGIF },
 		zonesCard,
 		gifSeg, fitRow,
 		phoneSound: phoneMic,
