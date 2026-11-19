@@ -383,7 +383,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		txt.oninput = () => { a.txt = txt.value; a.build(); };
 		// is a GIF needed? (only for the picture as it is, without text: the bridge sends the GIF of the pack, as before)
 		const isText = () => kind === 'gif' && gifs3.some(g => GM.TEXTGIF && GM.TEXTGIF.has(g));
-		a.made = () => !isText() && (a.fx !== 'orig' || a.bgfx !== '' || a.fit !== 'fit' || a.txt.trim() !== '' || a.bg !== 0 || (kind === 'gif' && gifs3.length > 1));
+		// one picture "as it is" keeps its own animation even stretched or filling: the lights stretch it (no GIF made here)
+		a.made = () => !isText() && (a.fx !== 'orig' || a.bgfx !== '' || (kind === 'draw' && a.fit !== 'fit') || a.txt.trim() !== '' || a.bg !== 0 || (kind === 'gif' && gifs3.length > 1));
 		a.build = () => {
 			const [w, h] = sizeNow();
 			const sp = a.sprites.length ? a.sprites : null;
@@ -391,7 +392,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			pvw.hidden = !a.made() || (!sp && !a.txt.trim());
 			[...box.children].forEach(el => { if (el !== info) el.hidden = isText() || (el === pvw && pvw.hidden); });
 			if (isText()) { info.textContent = 'Esta imagem já é um texto: aparece sozinha e como está. Para pôr o teu texto, escolhe outra imagem e escreve-o aqui.'; return; }
-			if (pvw.hidden) { info.textContent = kind === 'gif' && a.fx === 'orig' && !a.bgfx && a.fit === 'fit' && gifs3.length < 2 ? 'Como está: a imagem aparece com a animação dela.' : ''; return; }
+			if (pvw.hidden) { info.textContent = kind === 'gif' && a.fx === 'orig' && !a.bgfx && gifs3.length < 2 ? 'Como está: a imagem aparece com a animação dela.' : ''; return; }
 			if (a.txt.trim() && isBad(a.txt)) { info.textContent = 'Essa palavra não pode aparecer. Escolhe outra!'; return; }
 			a.frames = GM.frames({ W: w, H: h, sprites: a.sprites, fx: a.fx === 'orig' ? 'still' : a.fx, bgfx: a.bgfx, fit: a.fit, text: a.txt, tpos: a.tpos, c1: rgb(a.c1), bg: rgb(a.bg) });
 			a.bytes = GM.encode(a.frames, w, h, a.spd);
@@ -536,6 +537,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		} else if (tab === 'gif') {
 			if (!gif) { say('Escolhe primeiro uma imagem.', 'err'); return; }
 			body = { k: 'gif', f: gif };
+			if (gifA.fit && gifA.fit !== 'fit') body.fit = gifA.fit;   // stretched / filling: done by the lights, the picture keeps its animation
 			if (gifA.made && gifA.made()) anim = gifA;
 		} else if (tab === 'fx') {
 			if (!fx) { say('Escolhe primeiro um efeito.', 'err'); return; }

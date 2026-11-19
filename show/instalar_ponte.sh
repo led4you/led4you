@@ -275,7 +275,9 @@ def check(msg, allow_free=False, att=None):
         f = str(m.get("f", ""))
         if not GIF_OK.match(f):
             return None
-        return "gif", segs({"fx": FX_IMAGE, "n": f, "sx": 128, "ix": 0, "c3": 0, "frz": False}), {"f": f, "where": where}
+        # v16: tamanho da imagem como na placa (na proporção / esticada / a encher, cortando as pontas)
+        c3 = {"fit": 0, "stretch": 15, "fill": 25}.get(str(m.get("fit", "fit")), 0)
+        return "gif", segs({"fx": FX_IMAGE, "n": f, "sx": 128, "ix": 0, "c3": c3, "frz": False}), {"f": f, "where": where}
     if k == "fx":
         e = str(m.get("e", ""))
         if e in FX_NAMES:
