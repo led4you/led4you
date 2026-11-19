@@ -1697,7 +1697,7 @@
 		return read().px;
 	}
 	// the frames of a made GIF:
-	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, text2 (a 2nd line at the bottom), tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
+	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, text2 (a 2nd line at the bottom, colour c2), dir1 / dir2 ('left' | 'right': where each line goes), tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
 	//       c1: [r,g,b], bg: [r,g,b] }   (o.sprite, one picture, still works)
 	function gmFrames(o) {
 		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1, fx = o.fx;
@@ -1785,14 +1785,17 @@
 				const subj = !has || tpos === 'middle';
 				const m = subj ? motion(tt, 9) : { dx: 0, dy: 0, mul: 1 };
 				const band = (tt * (W + H + 8)) - 4;
-				const tc = (gi, x, y) => {
-					let c = fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : C1;
+				const tc = (gi, x, y, col) => {
+					let c = fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : col || C1;
 					if (subj && fx === 'shine') { const d = Math.abs(x + y - band); if (d < 2.5) { const k = 0.8 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * k | 0); } }
 					return m.mul !== 1 ? c.map(v => v * m.mul | 0) : c;
 				};
 				const shown = len => subj && fx === 'grow' ? Math.max(1, Math.ceil(Math.min(1, tt / 0.7) * len)) : len;
-				const slideX = len => W - Math.round(tt * (W + len));        // across the matrix, once per loop
-				const x0 = (scroll && !vert ? W - Math.round(i * (tw + W) / N) : subj && fx === 'slide' && !vert ? slideX(tw) : tx) + m.dx;
+				// v16: each line goes to the side chosen ('left' = comes in on the right and goes out on the left, as usual)
+				const slideX = (len, d) => d === 'right' ? Math.round(tt * (W + len)) - len : W - Math.round(tt * (W + len));   // across, once per loop
+				const scrollX = (len, d) => d === 'right' ? Math.round(i * (len + W) / N) - len : W - Math.round(i * (len + W) / N);
+				const d1 = o.dir1 || 'left', d2 = o.dir2 || (fx === 'slide' ? 'right' : 'left');
+				const x0 = (scroll && !vert ? scrollX(tw, d1) : subj && fx === 'slide' && !vert ? slideX(tw, d1) : tx) + m.dx;
 				const y0 = (scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
 				const n1 = shown(glyphs.length);
 				glyphs.slice(0, n1).forEach((gl, gi) => {
@@ -1802,8 +1805,8 @@
 				});
 				if (two) {
 					// the bottom line goes the other way when sliding across
-					const x2 = (scroll2 ? W - Math.round(i * (tw2 + W) / N) : subj && fx === 'slide' ? Math.round(tt * (W + tw2)) - tw2 : tx2) + m.dx, y2 = ty2b + m.dy;
-					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') { const px = x2 + gi * 4 + gx, py = y2 + gy; put(px, py, tc(gi + 3, px, py)); } });
+					const x2 = (scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = ty2b + m.dy;
+					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') { const px = x2 + gi * 4 + gx, py = y2 + gy; put(px, py, tc(gi + 3, px, py, o.c2)); } });
 				}
 			}
 			frames.push(f);

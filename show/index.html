@@ -90,7 +90,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     </div>
     <div class="lab" id="quickLab">Ou escolhe uma destas</div>
     <div class="chips" id="quick"></div>
-    <div class="lab">Cor</div>
+    <div class="lab" id="txtColLab">Cor</div>
     <div class="swatches" id="txtCols"></div>
     <div class="prev" id="txtPrev"></div>
     <div class="anim" id="txtStyle"></div>
@@ -135,7 +135,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=19"></script>
+<script src="../studio.js?v=20"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -412,23 +412,31 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 
 	// ---- v16: how the message is shown: scrolling (as always, by the lights), or on top / in the middle / at the bottom,
 	// or two lines, with an animation (then it goes as a GIF made on this phone, like the pictures) ----
-	const txtS = { style: 'scroll', fx: 'still', bg: 0, spd: 90, t2: '', frames: [], bytes: null };
+	const txtS = { style: 'scroll', fx: 'still', bg: 0, spd: 90, t2: '', c2: URL_THEME === 'xm' ? 5 : 7, d1: 'left', d2: 'right', frames: [], bytes: null };
 	if (GM) {
 		const box = $('txtStyle'), mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
-		const styles = mk('div', 'chips'), fxs = mk('div', 'chips'), spd = mk('div', 'chips'), bg = mk('div', 'swatches');
+		const styles = mk('div', 'chips'), fxs = mk('div', 'chips'), spd = mk('div', 'chips'), bg = mk('div', 'swatches'), c2 = mk('div', 'swatches');
+		const d1 = mk('div', 'chips'), d2 = mk('div', 'chips'), d1lab = mk('div', 'lab', 'A linha de cima vai para'), d2lab = mk('div', 'lab', 'A linha de baixo vai para'), c2lab = mk('div', 'lab', 'Cor da linha de baixo');
 		const t2 = mk('input'); t2.type = 'text'; t2.maxLength = 40; t2.autocomplete = 'off'; t2.placeholder = 'Texto da linha de baixo';
 		const t2lab = mk('label', 'lab', 'Linha de baixo'), cv = mk('canvas'), pvw = mk('div', 'apv'), info = mk('p', 'note ainfo'); pvw.append(cv);
-		const extra = [mk('div', 'lab', 'Animação'), fxs, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw];
+		const extra = [mk('div', 'lab', 'Animação'), fxs, d1lab, d1, d2lab, d2, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw];
 		const row = (el, list, cur, on) => el.replaceChildren(...list.map(([v, n]) => { const b = mk('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); return b; }));
 		const draw = () => {
 			row(styles, [['scroll', '➡️ A passar (normal)'], ['top', '⬆️ Em cima'], ['middle', '⏺️ No meio'], ['bottom', '⬇️ Em baixo']].concat(cfg.free ? [['two', '↕️ Duas linhas']] : []), txtS.style, v => { txtS.style = v; draw(); txtS.build(); });
 			row(fxs, [['still', 'Parado']].concat(ANIMS.slice(1)), txtS.fx, v => { txtS.fx = v; draw(); txtS.build(); });
 			row(spd, SPEEDS.map(([n, ms]) => [ms, n]), txtS.spd, v => { txtS.spd = v; draw(); txtS.build(); });
-			const on = txtS.style !== 'scroll';
+			const DIRS = [['left', '⬅️ Para a esquerda'], ['right', '➡️ Para a direita']];
+			row(d1, DIRS, txtS.d1, v => { txtS.d1 = v; draw(); txtS.build(); });
+			row(d2, DIRS, txtS.d2, v => { txtS.d2 = v; draw(); txtS.build(); });
+			const on = txtS.style !== 'scroll', two = txtS.style === 'two';
 			extra.concat([info]).forEach(e => e.hidden = !on);
-			t2lab.hidden = t2.hidden = txtS.style !== 'two';
+			t2lab.hidden = t2.hidden = c2lab.hidden = c2.hidden = !two;
+			d2lab.hidden = d2.hidden = !two;
+			d1lab.textContent = two ? 'A linha de cima vai para' : 'O texto vai para';
+			$('txtColLab').textContent = two ? 'Cor da linha de cima' : 'Cor';
 		};
-		box.append(mk('div', 'lab', 'Como aparece'), styles, t2lab, t2, ...extra, info);
+		box.append(mk('div', 'lab', 'Como aparece'), styles, t2lab, t2, c2lab, c2, ...extra, info);
+		swatches(c2, [1, 2, 3, 4, 5, 6, 7, 8], txtS.c2, i => { txtS.c2 = i; txtS.build(); });
 		swatches(bg, [0, 1, 2, 3, 4, 5, 6, 7, 8], txtS.bg, i => { txtS.bg = i; txtS.build(); });
 		bg.querySelector('.sw.erase').setAttribute('aria-label', 'Preto'); bg.querySelector('.sw.erase').style.background = '#000';
 		t2.oninput = () => { txtS.t2 = t2.value; txtS.build(); };
@@ -439,7 +447,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			if (!t1 && !l2) { info.textContent = 'Escreve ou escolhe uma mensagem.'; return; }
 			if (isBad(t1) || (l2 && isBad(l2))) { info.textContent = 'Essa mensagem não pode aparecer. Escolhe outra!'; return; }
 			const [w, h] = sizeNow();
-			txtS.frames = GM.frames({ W: w, H: h, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, c1: rgb(txtCol), bg: rgb(txtS.bg) });
+			txtS.frames = GM.frames({ W: w, H: h, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, c1: rgb(txtCol), c2: rgb(txtS.c2), dir1: txtS.d1, dir2: txtS.d2, bg: rgb(txtS.bg) });
 			txtS.bytes = GM.encode(txtS.frames, w, h, txtS.spd);
 			if (txtS.bytes.length > 60000) { info.textContent = 'Fica grande demais para as luzes. Escolhe um texto mais curto.'; txtS.bytes = null; }
 		};
