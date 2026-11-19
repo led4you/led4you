@@ -12,6 +12,11 @@
 	const T = [
 		// --- Make a GIF (GIF maker in the Images tab) ---
 		['Make a GIF', 'Criar um GIF', 'Crear un GIF', 'Créer un GIF'],
+		['Background effect', 'Efeito de fundo', 'Efecto de fondo', 'Effet de fond'],
+		['Nothing', 'Nenhum', 'Ninguno', 'Aucun'],
+		['Twinkling stars', 'Estrelas a piscar', 'Estrellas que brillan', 'Étoiles scintillantes'],
+		['Flames', 'Chamas', 'Llamas', 'Flammes'],
+		['Flying bats', 'Morcegos a voar', 'Murciélagos volando', 'Chauves-souris qui volent'],
 		['Second picture (optional)', 'Segundo desenho (opcional)', 'Segundo dibujo (opcional)', 'Deuxième image (facultatif)'],
 		['Third picture (optional)', 'Terceiro desenho (opcional)', 'Tercer dibujo (opcional)', 'Troisième image (facultatif)'],
 		['— none —', '— nenhum —', '— ninguno —', '— aucune —'],

@@ -1660,8 +1660,12 @@
 		b(0x3B);
 		return new Uint8Array(out);
 	}
+	// v94: the movement of the picture / text and the background effect are two separate choices
 	const GM_FX = [['still', 'Still'], ['blink', 'Blink'], ['pulse', 'Pulse'], ['rainbow', 'Rainbow colours'], ['bounce', 'Bounce'], ['shake', 'Shake'],
-		['slide', 'Slide across'], ['grow', 'Grow'], ['shine', 'Shine'], ['snow', 'Falling snow'], ['sparkle', 'Sparkles'], ['hearts', 'Rising hearts']];
+		['slide', 'Slide across'], ['grow', 'Grow'], ['shine', 'Shine']];
+	const GM_BG = [['', 'Nothing'], ['snow', 'Falling snow'], ['stars', 'Twinkling stars'], ['confetti', 'Confetti'], ['fireworks', 'Fireworks'],
+		['hearts', 'Rising hearts'], ['fire', 'Flames'], ['bats', 'Flying bats'], ['sparkle', 'Sparkles']];
+	const BAT = ['10001', '11011', '01110'];
 	const rgb2hsv = ([r, g, b]) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
 		let hh = 0; if (d) hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [((hh / 6) + 1) % 1, mx ? d / mx : 0, mx]; };
 	const hsv2rgb = (hh, s, v) => { const i = Math.floor(hh * 6), f = hh * 6 - i, p = v * (1 - s), q = v * (1 - f * s), u = v * (1 - (1 - f) * s);
@@ -1700,7 +1704,10 @@
 	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, text2 (a 2nd line at the bottom, colour c2), dir1 / dir2 ('left' | 'right': where each line goes), tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
 	//       c1: [r,g,b], bg: [r,g,b] }   (o.sprite, one picture, still works)
 	function gmFrames(o) {
-		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1, fx = o.fx;
+		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1;
+		// the old single list had the backgrounds among the movements: they still work
+		let fx = o.fx, bgfx = o.bgfx || '';
+		if (['snow', 'sparkle', 'hearts'].includes(fx)) { bgfx = bgfx || fx; fx = 'still'; }
 		const sprites = (o.sprites || (o.sprite ? [o.sprite] : [])).filter(Boolean).slice(0, 3);
 		const toGl = t => Array.from((t || '').trim().toUpperCase()).map(ch => F35[ch.normalize('NFD').charAt(0)] || F35['?']);
 		let glyphs = toGl(o.text), glyphs2 = toGl(o.text2), tp0 = o.tpos || 'bottom';
@@ -1742,18 +1749,34 @@
 		});
 		const groupW = n ? Math.max(...boxes.map(b => b.x + b.dw)) - Math.min(...boxes.map(b => b.x)) : 0;
 		const groupX = n ? Math.min(...boxes.map(b => b.x)) : 0;
-		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: n ? W + groupW : vert ? H + th : W + Math.max(tw, tw2), grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
+		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: n ? W + groupW : vert ? H + th : W + Math.max(tw, tw2), grow: 20, shine: 24 }[fx] || 16;
+		const bgN = { snow: H * 2, stars: 24, confetti: H * 2, fireworks: 32, hearts: H + 6, fire: 16, bats: W + 6, sparkle: 16 }[bgfx] || 0;
+		if (bgN) N = N <= 1 ? bgN : Math.max(N, bgN);
 		if (scroll) N = Math.max(N, (vert ? th + H : tw + W) + 2);
 		if (scroll2) N = Math.max(N, tw2 + W + 2);
 		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
 		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * Math.max(1, W - 5)), R() * (H + 6)]);
+		const MULTI = [[255, 42, 42], [255, 210, 63], [57, 211, 83], [43, 183, 255], [155, 92, 255], [255, 79, 216], [255, 122, 26]];
+		const stars = Array.from({ length: Math.max(5, Math.round(W * H / 24)) }, () => [Math.floor(R() * W), Math.floor(R() * H), R()]);
+		const confetti = Array.from({ length: Math.max(6, Math.round(W * H / 22)) }, () => [R() * W, R() * H, R() < .5 ? 1 : 2, MULTI[Math.floor(R() * MULTI.length)]]);
+		const nB = Math.max(3, Math.round(W * H / 90)), bursts = Array.from({ length: nB }, (_, k) => [Math.floor(W * (0.2 + 0.6 * R())), Math.floor(H * (0.2 + 0.5 * R())), k / nB + R() * 0.1, MULTI[Math.floor(R() * MULTI.length)]]);
+		const bats = Array.from({ length: Math.max(2, Math.round(W / 8)) }, () => [R() * (W + 6), Math.floor(R() * Math.max(1, H - 4)), R() < .5 ? 1 : 2]);
 		const frames = [];
 		for (let i = 0; i < N; i++) {
 			const tt = i / N, f = new Array(W * H).fill(null).map(() => BG.slice());
 			const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) f[y * W + x] = c; };
-			if (fx === 'snow') for (const [x, y0, sp] of flakes) put(x, Math.floor((y0 + tt * H * sp) % H), [235, 240, 255]);
-			if (fx === 'hearts') for (const [x0, y0] of hearts) { const y = Math.floor(H - ((y0 + tt * (H + 6)) % (H + 6))); HEART.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1') put(x0 + rx, y + ry, C1); })); }
-			if (fx === 'sparkle') { const Rf = rnd(100 + i); for (let s = 0; s < Math.round(W * H / 22); s++) { const x = Math.floor(Rf() * W), y = Math.floor(Rf() * H), v = Rf(); put(x, y, C1.map(c => c * (0.35 + 0.65 * v) | 0)); } }
+			// background effect first, then the pictures and the text on top (every one loops with the GIF)
+			if (bgfx === 'snow') for (const [x, y0, sp] of flakes) put(x, Math.floor((y0 + tt * H * sp) % H), [235, 240, 255]);
+			if (bgfx === 'hearts') for (const [x0, y0] of hearts) { const y = Math.floor(H - ((y0 + tt * (H + 6)) % (H + 6))); HEART.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1') put(x0 + rx, y + ry, [255, 79, 216]); })); }
+			if (bgfx === 'sparkle') { const Rf = rnd(100 + i); for (let s = 0; s < Math.round(W * H / 22); s++) { const x = Math.floor(Rf() * W), y = Math.floor(Rf() * H), v = Rf(); put(x, y, C1.map(c => c * (0.35 + 0.65 * v) | 0)); } }
+			if (bgfx === 'stars') for (const [x, y, ph] of stars) { const v = 0.5 + 0.5 * Math.sin(2 * Math.PI * (tt * 2 + ph)); if (v > 0.15) put(x, y, [255, 240, 190].map(c => c * v | 0)); }
+			if (bgfx === 'confetti') for (const [x0, y0, sp, c] of confetti) { const y = (y0 + tt * H * sp) % H; put(Math.floor((x0 + y * 0.5) % W), Math.floor(y), c); }
+			if (bgfx === 'fireworks') for (const [cx, cy, ph, c] of bursts) { const p = (tt + ph) % 1; if (p > 0.75) continue; const q = p / 0.75, r = 1 + q * Math.min(W, H) * 0.32, a = 1 - q * q;
+				for (let k = 0; k < 12; k++) { const an = k / 12 * 6.283; put(Math.round(cx + Math.cos(an) * r), Math.round(cy + Math.sin(an) * r), c.map(v => v * a | 0)); } put(cx, cy, p < 0.1 ? [255, 255, 255] : BG); }
+			if (bgfx === 'fire') for (let x = 0; x < W; x++) { const hgt = Math.round(H * (0.18 + 0.14 * Math.sin(2 * Math.PI * (tt * 2 + x * 0.37)) + 0.08 * Math.sin(2 * Math.PI * (tt * 3 + x * 0.91 + 0.3))));
+				for (let k = 0; k < hgt; k++) { const v = 1 - k / Math.max(1, hgt); put(x, H - 1 - k, [255, 60 + 170 * v | 0, 20 * v | 0]); } }
+			if (bgfx === 'bats') for (const [x0, y0, sp] of bats) { const x = Math.floor(((x0 + tt * (W + 6) * sp) % (W + 6)) - 5), y = Math.round(y0 + Math.sin(2 * Math.PI * (tt * 3 + x0)) * 1.2), flap = (i >> 1) % 2;
+				BAT.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1' && !(flap && ry === 0)) put(x + rx, y + ry, [155, 92, 255]); })); }
 			const off = fx === 'blink' && i >= N / 2;
 			const motion = (ph, seed) => {   // ph: 0..1 phase of this picture (pictures side by side take turns)
 				let dx = 0, dy = 0, sc = 1, mul = 1;
@@ -1816,6 +1839,7 @@
 	function gifMakerCard(t, toast, base) {
 		let o = { pic: 'hw-pumpkin.gif', pic2: '', pic3: '', tpos: 'bottom', fx: 'bounce', txt: '', c1: '#ffd23f', bg: '#000000', spd: 90, size: 0, name: '' };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yGifMaker') || '{}')); } catch (e) {}
+		if (['snow', 'sparkle', 'hearts'].includes(o.fx)) { o.bgfx = o.fx; o.fx = 'still'; }   // saved with the old single list
 		let draw = null;
 		try { draw = JSON.parse(localStorage.getItem('l4yGifDraw') || 'null'); } catch (e) {}
 		if (!Array.isArray(draw) || draw.length !== 256) draw = new Array(256).fill(null);
@@ -1832,6 +1856,7 @@
 		const pic3Sel = h('select', { 'aria-label': 'Third picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
 		const tposSel = h('select', { 'aria-label': 'Where the text goes' }, [['bottom', 'Below'], ['top', 'Above'], ['left', 'On the left (letters one under the other)'], ['right', 'On the right (letters one under the other)'], ['middle', 'Over the picture']].map(([v, n]) => h('option', { value: v }, n)));
 		const fxSel = h('select', { 'aria-label': 'Animation' }, GM_FX.map(([v, n]) => h('option', { value: v }, n)));
+		const bgSel = h('select', { 'aria-label': 'Background effect' }, GM_BG.map(([v, n]) => h('option', { value: v }, n)));
 		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (i === 1 && sizes.length > 2 ? ' (your matrix)' : ''))));
 		const txt = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'Optional: a short text', value: o.txt || '' });
 		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Text and effect colour' });
@@ -1868,12 +1893,12 @@
 		const build = () => {
 			[W, H] = sizes[+sizeSel.value] || sizes[0];
 			delay = +spd.value;
-			frames = gmFrames({ W, H, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
+			frames = gmFrames({ W, H, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
 			const fx = fxSel.value;
 			bytes = gifEncode(frames, W, H, delay);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
-			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
+			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, bgfx: bgSel.value, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
 			save();
 		};
 		const setPic = async () => {
@@ -1933,13 +1958,14 @@
 			const a = h('a', { href: URL.createObjectURL(new Blob([bytes], { type: 'image/gif' })), download: fileName() });
 			document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 		};
-		[fxSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
+		[fxSel, bgSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
 		pic2Sel.onchange = pic3Sel.onchange = setPic;
 		spd.addEventListener('input', build);
 		txt.oninput = build;
 		nameIn.oninput = () => { o.name = nameIn.value; save(); };
 		picSel.onchange = setPic;
 		fxSel.value = o.fx; if (!fxSel.value) fxSel.value = 'bounce';
+		bgSel.value = o.bgfx || '';
 		sizeSel.value = String(Math.min(o.size || 0, sizes.length - 1));
 		tposSel.value = o.tpos || 'bottom';
 		drawGrid();
@@ -1957,6 +1983,7 @@
 			h('label', { class: 'fld' }, h('span', {}, 'Second picture (optional)'), pic2Sel),
 			h('label', { class: 'fld' }, h('span', {}, 'Third picture (optional)'), pic3Sel),
 			h('label', { class: 'fld' }, h('span', {}, 'Animation'), fxSel),
+			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Text'), txt),
 			h('label', { class: 'fld' }, h('span', {}, 'Where the text goes'), tposSel),
 			h('div', { class: 'rowc' }, h('label', { class: 'gmcol' }, c1, h('span', {}, 'Text / effect')), h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background'))),
@@ -2262,7 +2289,7 @@
 		extrasCards,
 		gifPackCard,
 		gifMakerCard,
-		gm: { encode: gifEncode, frames: gmFrames, loadSprite: gmLoadSprite, FX: GM_FX, TEXTGIF: GM_TEXTGIF },
+		gm: { encode: gifEncode, frames: gmFrames, loadSprite: gmLoadSprite, FX: GM_FX, BG: GM_BG, TEXTGIF: GM_TEXTGIF },
 		zonesCard,
 		gifSeg, fitRow,
 		phoneSound: phoneMic,
