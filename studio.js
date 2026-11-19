@@ -1742,7 +1742,7 @@
 		});
 		const groupW = n ? Math.max(...boxes.map(b => b.x + b.dw)) - Math.min(...boxes.map(b => b.x)) : 0;
 		const groupX = n ? Math.min(...boxes.map(b => b.x)) : 0;
-		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: W + groupW, grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
+		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: n ? W + groupW : vert ? H + th : W + Math.max(tw, tw2), grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
 		if (scroll) N = Math.max(N, (vert ? th + H : tw + W) + 2);
 		if (scroll2) N = Math.max(N, tw2 + W + 2);
 		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
@@ -1780,19 +1780,30 @@
 				}
 			});
 			if (glyphs.length && !off) {
-				// with no picture (or text over it) the text itself bounces, shakes or pulses
-				const m = has && tpos !== 'middle' ? { dx: 0, dy: 0, mul: 1 } : motion(tt, 9);
-				const x0 = (scroll && !vert ? W - Math.round(i * (tw + W) / N) : tx) + m.dx;
-				const y0 = (scroll && vert ? H - Math.round(i * (th + H) / N) : ty) + m.dy;
-				const tc = gi => (fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : C1).map(v => v * m.mul | 0);
-				glyphs.forEach((gl, gi) => {
+				// with no picture (or text over it) the text itself does the animation: bounces, shakes, pulses, slides across,
+				// grows (the letters come in one by one) or shines
+				const subj = !has || tpos === 'middle';
+				const m = subj ? motion(tt, 9) : { dx: 0, dy: 0, mul: 1 };
+				const band = (tt * (W + H + 8)) - 4;
+				const tc = (gi, x, y) => {
+					let c = fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : C1;
+					if (subj && fx === 'shine') { const d = Math.abs(x + y - band); if (d < 2.5) { const k = 0.8 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * k | 0); } }
+					return m.mul !== 1 ? c.map(v => v * m.mul | 0) : c;
+				};
+				const shown = len => subj && fx === 'grow' ? Math.max(1, Math.ceil(Math.min(1, tt / 0.7) * len)) : len;
+				const slideX = len => W - Math.round(tt * (W + len));        // across the matrix, once per loop
+				const x0 = (scroll && !vert ? W - Math.round(i * (tw + W) / N) : subj && fx === 'slide' && !vert ? slideX(tw) : tx) + m.dx;
+				const y0 = (scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
+				const n1 = shown(glyphs.length);
+				glyphs.slice(0, n1).forEach((gl, gi) => {
 					const gx0 = vert ? x0 : x0 + gi * 4 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
 					for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
-						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) put(gx0 + gx * tScale + a, gy0 + gy * tScale + b2, tc(gi));
+						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) { const px = gx0 + gx * tScale + a, py = gy0 + gy * tScale + b2; put(px, py, tc(gi, px, py)); }
 				});
 				if (two) {
-					const x2 = (scroll2 ? W - Math.round(i * (tw2 + W) / N) : tx2) + m.dx, y2 = ty2b + m.dy;
-					glyphs2.forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') put(x2 + gi * 4 + gx, y2 + gy, tc(gi + 3)); });
+					// the bottom line goes the other way when sliding across
+					const x2 = (scroll2 ? W - Math.round(i * (tw2 + W) / N) : subj && fx === 'slide' ? Math.round(tt * (W + tw2)) - tw2 : tx2) + m.dx, y2 = ty2b + m.dy;
+					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') { const px = x2 + gi * 4 + gx, py = y2 + gy; put(px, py, tc(gi + 3, px, py)); } });
 				}
 			}
 			frames.push(f);
