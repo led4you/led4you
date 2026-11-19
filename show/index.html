@@ -93,6 +93,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     <div class="lab">Cor</div>
     <div class="swatches" id="txtCols"></div>
     <div class="prev" id="txtPrev"></div>
+    <div class="anim" id="txtStyle"></div>
   </section>
 
   <section class="card" id="pGif" hidden>
@@ -134,7 +135,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=17"></script>
+<script src="../studio.js?v=18"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -192,7 +193,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	// ---- message ----
 	let txtCol = URL_THEME === 'xm' ? 2 : 3, quick = null;
 	const chosenText = () => cfg.free ? ($('txt').value.trim() || (quick ? (SHOWN[quick] || quick) : '')) : (quick ? (SHOWN[quick] || quick) : '');
-	const updPrev = () => { const v = chosenText(); $('txtPrev').textContent = v || '…'; $('txtPrev').style.color = '#' + PAL[txtCol]; };
+	const updPrev = () => { const v = chosenText(); $('txtPrev').textContent = v || '…'; $('txtPrev').style.color = '#' + PAL[txtCol]; if (typeof txtS !== 'undefined' && txtS.build) txtS.build(); };
 	const drawQuick = () => {
 		const list = QUICK[cfg.theme] || QUICK[''];
 		if (!list.includes(quick)) quick = list[0];
@@ -408,6 +409,55 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		return a;
 	};
 	const gifA = animBox($('gifAnim'), 'gif'), drawA = animBox($('drawAnim'), 'draw');
+
+	// ---- v16: how the message is shown: scrolling (as always, by the lights), or on top / in the middle / at the bottom,
+	// or two lines, with an animation (then it goes as a GIF made on this phone, like the pictures) ----
+	const txtS = { style: 'scroll', fx: 'still', bg: 0, spd: 90, t2: '', frames: [], bytes: null };
+	if (GM) {
+		const box = $('txtStyle'), mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
+		const styles = mk('div', 'chips'), fxs = mk('div', 'chips'), spd = mk('div', 'chips'), bg = mk('div', 'swatches');
+		const t2 = mk('input'); t2.type = 'text'; t2.maxLength = 40; t2.autocomplete = 'off'; t2.placeholder = 'Texto da linha de baixo';
+		const t2lab = mk('label', 'lab', 'Linha de baixo'), cv = mk('canvas'), pvw = mk('div', 'apv'), info = mk('p', 'note ainfo'); pvw.append(cv);
+		const extra = [mk('div', 'lab', 'Animação'), fxs, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw];
+		const row = (el, list, cur, on) => el.replaceChildren(...list.map(([v, n]) => { const b = mk('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); return b; }));
+		const draw = () => {
+			row(styles, [['scroll', '➡️ A passar (normal)'], ['top', '⬆️ Em cima'], ['middle', '⏺️ No meio'], ['bottom', '⬇️ Em baixo']].concat(cfg.free ? [['two', '↕️ Duas linhas']] : []), txtS.style, v => { txtS.style = v; draw(); txtS.build(); });
+			row(fxs, [['still', 'Parado']].concat(ANIMS.slice(1)), txtS.fx, v => { txtS.fx = v; draw(); txtS.build(); });
+			row(spd, SPEEDS.map(([n, ms]) => [ms, n]), txtS.spd, v => { txtS.spd = v; draw(); txtS.build(); });
+			const on = txtS.style !== 'scroll';
+			extra.concat([info]).forEach(e => e.hidden = !on);
+			t2lab.hidden = t2.hidden = txtS.style !== 'two';
+		};
+		box.append(mk('div', 'lab', 'Como aparece'), styles, t2lab, t2, ...extra, info);
+		swatches(bg, [0, 1, 2, 3, 4, 5, 6, 7, 8], txtS.bg, i => { txtS.bg = i; txtS.build(); });
+		bg.querySelector('.sw.erase').setAttribute('aria-label', 'Preto'); bg.querySelector('.sw.erase').style.background = '#000';
+		t2.oninput = () => { txtS.t2 = t2.value; txtS.build(); };
+		txtS.build = () => {
+			txtS.bytes = null; txtS.frames = []; info.textContent = '';
+			if (txtS.style === 'scroll') return;
+			const t1 = chosenText().slice(0, 40), l2 = txtS.style === 'two' ? txtS.t2.trim().slice(0, 40) : '';
+			if (!t1 && !l2) { info.textContent = 'Escreve ou escolhe uma mensagem.'; return; }
+			if (isBad(t1) || (l2 && isBad(l2))) { info.textContent = 'Essa mensagem não pode aparecer. Escolhe outra!'; return; }
+			const [w, h] = sizeNow();
+			txtS.frames = GM.frames({ W: w, H: h, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, c1: rgb(txtCol), bg: rgb(txtS.bg) });
+			txtS.bytes = GM.encode(txtS.frames, w, h, txtS.spd);
+			if (txtS.bytes.length > 60000) { info.textContent = 'Fica grande demais para as luzes. Escolhe um texto mais curto.'; txtS.bytes = null; }
+		};
+		let pi = 0, pt = 0;
+		const loop = now => {
+			requestAnimationFrame(loop);
+			if (box.offsetParent === null || pvw.hidden || !txtS.frames.length || now - pt < txtS.spd) return;
+			pt = now; pi = (pi + 1) % txtS.frames.length;
+			const [w, h] = sizeNow(), cell = Math.max(3, Math.floor(Math.min(300, (box.clientWidth || 300) - 20) / Math.max(w, h)));
+			if (cv.width !== cell * w * 2) { cv.width = cell * w * 2; cv.height = cell * h * 2; cv.style.width = cell * w + 'px'; cv.style.height = cell * h + 'px'; }
+			const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, cell * w, cell * h);
+			const f = txtS.frames[pi] || txtS.frames[0]; if (!f || f.length !== w * h) return;
+			for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = f[y * w + x]; g.fillStyle = c[0] + c[1] + c[2] > 9 ? 'rgb(' + c + ')' : '#15161c'; g.beginPath(); g.arc(x * cell + cell / 2, y * cell + cell / 2, cell * .42, 0, 6.283); g.fill(); }
+		};
+		requestAnimationFrame(loop);
+		txtS.draw = draw;
+		draw();
+	} else $('txtStyle').hidden = true;
 	// the picture of the chosen GIF (the frame with most LEDs on), or the drawing, as the sprite to animate
 	const spCache = {};
 	const loadGifSprite = async () => {
@@ -434,7 +484,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	};
 
 	// ---- state of the lights (posted by the bridge on "<code>-estado") ----
-	const apply = () => { drawFaces(); drawQuick(); drawGifs(); drawFx(); buildGrid(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
+	const apply = () => { drawFaces(); drawQuick(); drawGifs(); drawFx(); buildGrid(); if (txtS.draw) txtS.draw(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
 	const checkOpen = () => fetch(RELAY + TOPIC + '-estado/json?poll=1&since=all').then(r => r.text()).then(txt => {
 		const last = txt.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
 		let st = null; try { st = last && JSON.parse(last.message); } catch (e) {}
@@ -457,12 +507,18 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		else { $('send').disabled = closed; $('send').textContent = 'Mostrar nas luzes!'; }
 	}
 	$('send').onclick = async () => {
-		let body, anim = null;
+		let body, anim = null, textGif = null;
 		if (tab === 'text') {
 			const t = chosenText().slice(0, 40);
 			if (!t) { say('Escolhe ou escreve uma mensagem.', 'err'); return; }
 			if (isBad(t)) { say('Essa mensagem não pode aparecer. Escolhe outra!', 'err'); return; }
 			body = cfg.free && $('txt').value.trim() ? { k: 'text', t, c: txtCol } : { k: 'quick', q: quick, c: txtCol };
+			if (txtS.style !== 'scroll') {
+				txtS.build();
+				if (!txtS.bytes) { say('Não foi possível preparar a mensagem. Escolhe outra ou um texto mais curto.', 'err'); return; }
+				const [w, h] = sizeNow();
+				textGif = { meta: { k: 'gifx', z: face, w, h, fx: txtS.fx, t, t2: txtS.style === 'two' ? txtS.t2.trim().slice(0, 40) : '', src: 'texto' }, bytes: txtS.bytes };
+			}
 		} else if (tab === 'gif') {
 			if (!gif) { say('Escolhe primeiro uma imagem.', 'err'); return; }
 			body = { k: 'gif', f: gif };
@@ -478,7 +534,10 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		}
 		body.z = face;
 		let req = { method: 'POST', body: JSON.stringify(body) }, url = RELAY + TOPIC;
-		if (anim) {
+		if (textGif) {
+			url = RELAY + TOPIC + '?filename=cubo.gif&message=' + encodeURIComponent(JSON.stringify(textGif.meta));
+			req = { method: 'POST', body: new Blob([textGif.bytes]) };
+		} else if (anim) {
 			// v16: an animated picture or drawing goes as a GIF attached to the message (the bridge puts it on the lights)
 			if (anim.txt.trim() && isBad(anim.txt)) { say('Essa palavra não pode aparecer. Escolhe outra!', 'err'); return; }
 			anim.build();

@@ -296,9 +296,13 @@ def check(msg, allow_free=False, att=None):
         w, h = m.get("w"), m.get("h")
         if not isint(w) or not isint(h) or any(f["w"] != w or f["h"] != h for f in faces):
             return None
-        t = str(m.get("t", ""))[:20].strip()
-        if t and (is_bad(t) or not (S["free"] or allow_free)):
-            return None
+        # o texto (e a 2.ª linha, v16): filtro de palavrões; sem "texto livre", só as mensagens prontas
+        quick = {plain(q).lower() for v in QUICK.values() for q in v}
+        lines = [str(m.get("t", ""))[:40].strip(), str(m.get("t2", ""))[:40].strip()]
+        for ln in lines:
+            if ln and (is_bad(ln) or not (S["free"] or allow_free or plain(ln).lower() in quick)):
+                return None
+        t = " / ".join(ln for ln in lines if ln)
         fx = str(m.get("fx", ""))
         if fx not in GIFX_FX:
             return None

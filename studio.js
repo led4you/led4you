@@ -1697,17 +1697,21 @@
 		return read().px;
 	}
 	// the frames of a made GIF:
-	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
+	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, text2 (a 2nd line at the bottom), tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
 	//       c1: [r,g,b], bg: [r,g,b] }   (o.sprite, one picture, still works)
 	function gmFrames(o) {
 		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1, fx = o.fx;
 		const sprites = (o.sprites || (o.sprite ? [o.sprite] : [])).filter(Boolean).slice(0, 3);
-		const text = (o.text || '').trim().toUpperCase();
-		const glyphs = Array.from(text).map(ch => F35[ch.normalize('NFD').charAt(0)] || F35['?']);
-		const has = sprites.length > 0, tpos = glyphs.length ? (o.tpos || 'bottom') : 'none';
+		const toGl = t => Array.from((t || '').trim().toUpperCase()).map(ch => F35[ch.normalize('NFD').charAt(0)] || F35['?']);
+		let glyphs = toGl(o.text), glyphs2 = toGl(o.text2), tp0 = o.tpos || 'bottom';
+		// two texts: the first one on top, the second one at the bottom (only the second one: it goes at the bottom)
+		if (!glyphs.length && glyphs2.length) { glyphs = glyphs2; glyphs2 = []; tp0 = 'bottom'; }
+		const two = glyphs.length > 0 && glyphs2.length > 0;
+		if (two) tp0 = 'top';
+		const has = sprites.length > 0, tpos = glyphs.length ? tp0 : 'none';
 		const vert = tpos === 'left' || tpos === 'right';
 		// text: bigger letters when there is no picture (or it goes over the picture); vertical text = letters one under the other
-		const tScale = (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
+		const tScale = !two && (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
 		const tw = vert ? 3 * tScale : glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
 		const th = vert ? (glyphs.length ? glyphs.length * 6 * tScale - tScale : 0) : 5 * tScale;
 		const scroll = vert ? th > H : tw > W;
@@ -1722,6 +1726,11 @@
 		if (vert && !has) tx = tpos === 'left' ? gap : W - tw - gap;
 		if (vert && !scroll) ty = Math.floor((H - th) / 2);
 		if (!vert && !scroll) tx = Math.floor((W - tw) / 2);
+		// the second line, at the bottom
+		const tw2 = glyphs2.length ? glyphs2.length * 4 - 1 : 0, scroll2 = tw2 > W, ty2 = H - 5 - gap, tx2 = Math.floor((W - tw2) / 2);
+		if (two && !has && H >= 18) ty = Math.max(gap, Math.floor(H / 2) - 6);   // no picture: the two lines closer to the middle
+		const ty2b = two && !has && H >= 18 ? Math.floor(H / 2) + 1 : ty2;
+		if (two && has) area.h = Math.max(4, ty2 - 1 - area.y);
 		// each picture in its own cell (side by side, or one under the other in a tall area), fitted with whole pixels when it grows
 		const n = sprites.length, across = area.w >= area.h;
 		const boxes = sprites.map((sp, j) => {
@@ -1735,6 +1744,7 @@
 		const groupX = n ? Math.min(...boxes.map(b => b.x)) : 0;
 		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: W + groupW, grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
 		if (scroll) N = Math.max(N, (vert ? th + H : tw + W) + 2);
+		if (scroll2) N = Math.max(N, tw2 + W + 2);
 		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
 		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * Math.max(1, W - 5)), R() * (H + 6)]);
 		const frames = [];
@@ -1780,6 +1790,10 @@
 					for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
 						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) put(gx0 + gx * tScale + a, gy0 + gy * tScale + b2, tc(gi));
 				});
+				if (two) {
+					const x2 = (scroll2 ? W - Math.round(i * (tw2 + W) / N) : tx2) + m.dx, y2 = ty2b + m.dy;
+					glyphs2.forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') put(x2 + gi * 4 + gx, y2 + gy, tc(gi + 3)); });
+				}
 			}
 			frames.push(f);
 		}
