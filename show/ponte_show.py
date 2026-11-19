@@ -31,6 +31,9 @@ BAD = ["merda", "caralho", "foda", "fodase", "puta", "cabrao", "cona", "piroca",
        "corno", "cu", "mamas", "boceta", "porra", "fuck", "shit", "bitch", "dick", "pussy", "cunt", "nigger", "nazi", "hitler"]
 FX_TEXT, FX_IMAGE = 122, 53          # efeitos do WLED: texto a passar, imagem (GIF)
 GIF_OK = re.compile(r"^(hw|xm|ev)-[a-z0-9]{2,20}\.gif$")
+GIFX_MAX = 65536      # v16: GIF animado feito no telemóvel do visitante (anexo do ntfy): tamanho máximo
+GIFX_URL = "https://ntfy.sh/file/"
+GIFX_FX = {"orig", "still", "blink", "pulse", "rainbow", "bounce", "shake", "slide", "grow", "shine", "snow", "sparkle", "hearts"}
 
 S = {   # definições (guardadas em show_config.json)
     "on": False, "topic": "l4yshow-3352b4beefd1", "board": "", "boardName": "",
@@ -181,6 +184,33 @@ def gif_on_board(ip, name):
         return False
 
 
+def upload_bytes(ip, name, gif):
+    b = uuid.uuid4().hex
+    body = (("--%s\r\nContent-Disposition: form-data; name=\"data\"; filename=\"/%s\"\r\nContent-Type: image/gif\r\n\r\n" % (b, name)).encode()
+            + gif + ("\r\n--%s--\r\n" % b).encode())
+    req = urllib.request.Request("http://%s/upload" % ip, data=body, headers={"Content-Type": "multipart/form-data; boundary=" + b})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        r.read()
+
+
+gifx_turn = {}        # v16: lado -> 0/1: os GIF animados alternam entre 2 nomes por lado (a placa lê sempre o novo)
+
+
+def put_gifx(ip, key, url, w, h):
+    """v16: descarrega o GIF animado do anexo do ntfy, confirma que é um GIF do tamanho do lado e envia-o para a placa
+    com um nome fixo por lado (cubo-<lado>-a/b.gif): não enche a memória da placa com um ficheiro por visitante"""
+    with urllib.request.urlopen(url, timeout=15) as r:
+        gif = r.read(GIFX_MAX + 1)
+    if len(gif) > GIFX_MAX or gif[:6] not in (b"GIF89a", b"GIF87a"):
+        raise ValueError("não é um GIF válido")
+    if int.from_bytes(gif[6:8], "little") != w or int.from_bytes(gif[8:10], "little") != h:
+        raise ValueError("o GIF não tem o tamanho do lado")
+    gifx_turn[key] = 1 - gifx_turn.get(key, 1)
+    name = "cubo-%s-%s.gif" % (key, "ab"[gifx_turn[key]])
+    upload_bytes(ip, name, gif)
+    return name
+
+
 def upload_gif(ip, name):
     # confirmado há menos de 10 minutos: não perguntar outra vez; senão ver se ainda lá está antes de o enviar de novo
     if time.time() - uploaded.get((ip, name), 0) < 600:
@@ -191,12 +221,7 @@ def upload_gif(ip, name):
     try:
         with urllib.request.urlopen(GIF_SITE + name, timeout=10) as r:
             gif = r.read()
-        b = uuid.uuid4().hex
-        body = (("--%s\r\nContent-Disposition: form-data; name=\"data\"; filename=\"/%s\"\r\nContent-Type: image/gif\r\n\r\n" % (b, name)).encode()
-                + gif + ("\r\n--%s--\r\n" % b).encode())
-        req = urllib.request.Request("http://%s/upload" % ip, data=body, headers={"Content-Type": "multipart/form-data; boundary=" + b})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            r.read()
+        upload_bytes(ip, name, gif)
         uploaded[(ip, name)] = time.time()
         return True
     except Exception as e:
@@ -204,8 +229,8 @@ def upload_gif(ip, name):
         return False
 
 
-def check(msg, allow_free=False):
-    """valida um pedido vindo da internet; devolve (tipo, comando, resumo) ou None"""
+def check(msg, allow_free=False, att=None):
+    """valida um pedido vindo da internet; devolve (tipo, comando, resumo) ou None (att = anexo do ntfy, v16)"""
     try:
         m = json.loads(msg)
     except Exception:
@@ -262,6 +287,25 @@ def check(msg, allow_free=False):
         if isinstance(c, list) and len(c) == 2 and all(isint(i) and 0 <= i < len(PAL) for i in c):
             part["col"] = [[int(PAL[i][j:j + 2], 16) for j in (0, 2, 4)] for i in c] + [[0, 0, 0]]
         return "fx", segs(part), {"e": e, "n": n, "where": where}
+    if k == "gifx":   # v16: imagem ou desenho animado no telemóvel do visitante, com texto opcional
+        if not isinstance(att, dict):
+            return None
+        url, size = str(att.get("url", "")), att.get("size", 0)
+        if not url.startswith(GIFX_URL) or not isint(size) or not 0 < size <= GIFX_MAX:
+            return None
+        w, h = m.get("w"), m.get("h")
+        if not isint(w) or not isint(h) or any(f["w"] != w or f["h"] != h for f in faces):
+            return None
+        t = str(m.get("t", ""))[:20].strip()
+        if t and (is_bad(t) or not (S["free"] or allow_free)):
+            return None
+        fx = str(m.get("fx", ""))
+        if fx not in GIFX_FX:
+            return None
+        src = str(m.get("src", ""))[:30]
+        key = "t" if z == -1 else str(z)
+        return "gifx", segs({"fx": FX_IMAGE, "n": "", "sx": 128, "ix": 0, "c3": 0, "frz": False}), \
+            {"url": url, "w": w, "h": h, "key": key, "fx": fx, "t": t, "src": src, "where": where}
     if k == "draw":
         p = str(m.get("p", ""))
         w, h = m.get("w"), m.get("h")
@@ -275,11 +319,11 @@ def check(msg, allow_free=False):
     return None
 
 
-def add(msg):
+def add(msg, att=None):
     if not S["on"] or not S["board"] or not S["faces"]:
         log("pedido ignorado: a opção está desligada")
         return
-    job = check(msg)
+    job = check(msg, att=att)
     if not job:
         log("pedido recusado:", msg[:80])
         return
@@ -364,6 +408,14 @@ def show_loop():
                     saved = (ip, http_json(ip, "/json/state"))
                 if kind == "gif" and not upload_gif(ip, cmd["seg"][0]["n"]):
                     continue
+                if kind == "gifx":
+                    try:
+                        name = put_gifx(ip, info["key"], info["url"], info["w"], info["h"])
+                    except Exception as e:
+                        log("o GIF animado não foi para a placa:", e)
+                        continue
+                    for sg in cmd["seg"]:
+                        sg["n"] = name
                 if kind == "fx":   # o número do efeito é o desta placa (os efeitos do LED4YOU podem ter outro número noutra)
                     fid = fx_id(ip, info["n"])
                     if fid < 0:
@@ -372,9 +424,10 @@ def show_loop():
                     for sg in cmd["seg"]:
                         sg["fx"] = fid
                 http_json(ip, "/json/state", cmd)
-                what = kind + ": " + (info.get("t") or info.get("f") or info.get("n") or "desenho") + " (" + info.get("where", "") + ")"
+                what = ("animação: %s%s" % (info["src"], " + " + info["t"] if info.get("t") else "") if kind == "gifx" else
+                        kind + ": " + (info.get("t") or info.get("f") or info.get("n") or "desenho")) + " (" + info.get("where", "") + ")"
                 log("a mostrar", what)
-                until = time.time() + max(3, int(S["seconds"].get(kind, 15)))
+                until = time.time() + max(3, int(S["seconds"].get("gif" if kind == "gifx" else kind, 15)))
                 for z in zones:
                     busy[z] = until
                     shown[z] = what
@@ -471,7 +524,7 @@ def listen():
                     if ev.get("event") != "message":
                         continue
                     since = ev.get("id", since)
-                    add(ev.get("message", ""))
+                    add(ev.get("message", ""), ev.get("attachment"))
         except Exception as e:
             log("canal desligado (%s); volto a ligar daqui a 5 s" % e)
             time.sleep(5)
@@ -616,6 +669,7 @@ function render(){
  $('pendCard').hidden=!st.pending.length;
  $('pend').replaceChildren(...st.pending.map(p=>{const d=document.createElement('div');d.className='item';const w=document.createElement('div');w.className='what';
   if(p.kind==='draw'){const c=document.createElement('canvas');c.width=p.info.w;c.height=p.info.h;c.style.width=(p.info.w*5)+'px';const g=c.getContext('2d');[...p.info.p].forEach((v,i)=>{if(v!=='0'){g.fillStyle='#'+['000000','ffffff','ff2a2a','ff7a1a','ffd23f','39d353','2bb7ff','9b5cff','ff4fd8'][+v];g.fillRect(i%p.info.w,Math.floor(i/p.info.w),1,1);}});w.append(c);}
+  else if(p.kind==='gifx'){const im=document.createElement('img');im.src=p.info.url;im.width=p.info.w*5;im.style.imageRendering='pixelated';im.style.background='#000';w.append(im);const s=document.createElement('div');s.textContent='Animação: '+p.info.src+(p.info.t?' + "'+p.info.t+'"':'');w.append(s);}
   else w.textContent=(p.kind==='text'?'Texto: '+p.info.t:p.kind==='fx'?'Efeito: '+p.info.n:'Imagem: '+p.info.f);if(p.info.where){const s=document.createElement('div');s.className='note';s.textContent=p.info.where;w.append(s);}
   const ok=document.createElement('button');ok.className='btn primary';ok.textContent='Mostrar';ok.onclick=()=>api('approve',{id:p.id}).then(refresh);
   const no=document.createElement('button');no.className='btn';no.textContent='Recusar';no.onclick=()=>api('reject',{id:p.id}).then(refresh);

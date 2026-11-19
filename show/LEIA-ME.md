@@ -1,7 +1,8 @@
-# Cubo das crianças (LED4YOU) — v15
+# Cubo das crianças (LED4YOU) — v16
 
 As crianças leem o código QR na parede e, no telemóvel, escrevem uma mensagem (ou escolhem uma pronta do tema),
-escolhem uma imagem animada ou fazem um desenho.
+escolhem uma imagem animada ou fazem um desenho. Desde a v16 podem também **dar vida à imagem ou ao desenho**
+(saltar, arco-íris, neve, faíscas, corações…), com um nome ou palavra por baixo e a cor do texto e do fundo.
 O pedido aparece logo no lado escolhido e substitui o que lá estava. Cada lado é independente: enquanto um lado
 mostra um texto, os outros recebem outros pedidos. Com a opção "Cada pedido espera que o anterior acabe", os
 pedidos para o mesmo lado esperam pela vez, por ordem de chegada.
@@ -65,6 +66,10 @@ Cada zona é uma matriz com o seu tamanho.
 - **Tempo** de cada mensagem, imagem, efeito (3 minutos de origem) e desenho.
 - **Espera entre pedidos do mesmo telemóvel**: 0 de origem (sem espera).
 - **Deixar o último pedido nas luzes até chegar outro**: dá tempo para tirar fotografias.
+- **Imagens e desenhos animados** (v16): a animação é feita no telemóvel do visitante e chega à ponte como anexo
+  do ntfy (só aceita GIF de até 64 KB, do tamanho do lado, vindo de ntfy.sh). A palavra escrita passa pelo mesmo filtro
+  das mensagens (e só é aceite com "texto livre" ligado). Na placa fica um ficheiro fixo por lado (`cubo-<lado>-a.gif`
+  e `cubo-<lado>-b.gif`, gravados por cima), por isso a memória da placa não enche. O tempo é o das imagens.
 - **Sem pedidos, voltar ao preset** (v15): escolha um preset da placa e os minutos (5 de origem); passado esse
   tempo sem nenhum pedido, o cubo volta a esse preset.
 - **Deixar escrever texto livre**: ligado de origem. Se o desligar, só se podem enviar as mensagens prontas.

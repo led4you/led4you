@@ -44,6 +44,10 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 .gif { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border-radius: 16px; border: 3px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .gif img { width: 76px; height: 76px; image-rendering: pixelated; background: #000; border-radius: 8px; }
 .gif[aria-pressed="true"] { border-color: var(--hot); }
+.anim { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.anim .apv { display: flex; justify-content: center; background: #000; border-radius: 14px; padding: 10px; }
+.anim .apv canvas { max-width: 100%; }
+.anim .ainfo { text-align: center; }
 .grid { display: grid; gap: 2px; background: #000; padding: 6px; border-radius: 14px; touch-action: none; user-select: none; }
 .cell { aspect-ratio: 1; border-radius: 3px; background: #1a1a1a; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -92,6 +96,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <section class="card" id="pGif" hidden>
     <div class="lab">Escolhe uma imagem</div>
     <div class="gifs" id="gifs"></div>
+    <div class="anim" id="gifAnim"></div>
   </section>
 
   <section class="card" id="pFx" hidden>
@@ -117,6 +122,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     <div class="swatches" id="drawCols"></div>
     <div class="grid" id="grid"></div>
     <div class="row"><button class="btn" type="button" id="clear">Apagar tudo</button></div>
+    <div class="anim" id="drawAnim"></div>
   </section>
 
   <button class="btn primary" type="button" id="send">Mostrar nas luzes!</button>
@@ -124,7 +130,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=14"></script>
+<script src="../studio.js?v=15"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -290,7 +296,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			const im = document.createElement('img'); im.src = '../gifs/' + f.f; im.alt = '';
 			const s = document.createElement('span'); s.textContent = PT[f.n] || f.n;
 			b.append(im, s);
-			b.onclick = () => { gif = f.f; drawGifs(); };
+			b.onclick = () => { gif = f.f; drawGifs(); loadGifSprite(); };
 			return b;
 		}));
 	};
@@ -311,12 +317,72 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	const paint = e => {
 		const el = document.elementFromPoint(e.clientX, e.clientY);
 		if (!el || el.dataset.i === undefined || !grid.contains(el)) return;
-		const i = +el.dataset.i; pixels[i] = pen; cells[i].style.background = pen ? '#' + PAL[pen] : '';
+		const i = +el.dataset.i; if (pixels[i] === pen) return; pixels[i] = pen; cells[i].style.background = pen ? '#' + PAL[pen] : ''; clearTimeout(paint.t); paint.t = setTimeout(drawSprite, 150);
 	};
 	grid.addEventListener('pointerdown', e => { down = true; try { grid.setPointerCapture(e.pointerId); } catch (er) {} paint(e); e.preventDefault(); });
 	grid.addEventListener('pointermove', e => { if (down) paint(e); });
 	['pointerup', 'pointercancel'].forEach(ev => grid.addEventListener(ev, () => down = false));
-	$('clear').onclick = () => { pixels.fill(0); cells.forEach(c => c.style.background = ''); };
+	$('clear').onclick = () => { pixels.fill(0); cells.forEach(c => c.style.background = ''); drawSprite(); };
+
+	// ---- v16: animate the picture or the drawing (the GIF is made on this phone, like "Make a GIF" in the app) ----
+	const GM = window.L4YStudio && L4YStudio.gm;
+	const ANIMS = [['orig', 'Como está'], ['bounce', '🦘 Saltar'], ['rainbow', '🌈 Arco-íris'], ['pulse', '💓 Pulsar'], ['blink', '💡 Piscar'], ['shake', '🫨 Tremer'],
+		['slide', '➡️ Atravessar'], ['grow', '🔍 Crescer'], ['shine', '✨ Brilho'], ['snow', '❄️ Neve'], ['sparkle', '🎇 Faíscas'], ['hearts', '💖 Corações']];
+	const SPEEDS = [['Devagar', 160], ['Normal', 90], ['Rápido', 50]];
+	const animBox = (box, kind) => {
+		const a = { fx: 'orig', txt: '', c1: URL_THEME === 'xm' ? 4 : 3, bg: 0, spd: 90, frames: [], bytes: null, sprite: null, key: '' };
+		if (!GM) { box.hidden = true; return a; }
+		const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
+		const chips = mk('div', 'chips'), spd = mk('div', 'chips'), c1 = mk('div', 'swatches'), bg = mk('div', 'swatches');
+		const txt = mk('input'); txt.type = 'text'; txt.maxLength = 20; txt.autocomplete = 'off'; txt.placeholder = 'Um nome ou palavra (opcional)';
+		const cv = mk('canvas'), info = mk('p', 'note ainfo'), pvw = mk('div', 'apv'); pvw.append(cv);
+		const chipRow = (row, list, cur, on) => row.replaceChildren(...list.map(([v, n]) => { const b = mk('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); return b; }));
+		const drawChips = () => { chipRow(chips, ANIMS, a.fx, v => { a.fx = v; drawChips(); a.build(); }); chipRow(spd, SPEEDS.map(([n, ms]) => [ms, n]), a.spd, v => { a.spd = v; drawChips(); a.build(); }); };
+		box.append(mk('div', 'lab', 'Dá vida ' + (kind === 'draw' ? 'ao teu desenho' : 'à imagem')), chips, mk('label', 'lab', 'Escreve um nome ou uma palavra (opcional)'), txt,
+			mk('div', 'lab', 'Cor do texto e do efeito'), c1, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw, info);
+		swatches(c1, [1, 2, 3, 4, 5, 6, 7, 8], a.c1, i => { a.c1 = i; a.build(); });
+		swatches(bg, [0, 1, 2, 3, 4, 5, 6, 7, 8], a.bg, i => { a.bg = i; a.build(); });
+		bg.querySelector('.sw.erase').setAttribute('aria-label', 'Preto'); bg.querySelector('.sw.erase').style.background = '#000';
+		txt.oninput = () => { a.txt = txt.value; a.build(); };
+		// is a GIF needed? (only for the picture as it is, without text: the bridge sends the GIF of the pack, as before)
+		a.made = () => a.fx !== 'orig' || a.txt.trim() !== '' || a.bg !== 0;
+		a.build = () => {
+			const [w, h] = sizeNow();
+			const sp = a.sprite;
+			info.textContent = ''; a.bytes = null; a.frames = [];
+			pvw.hidden = !a.made() || (!sp && !a.txt.trim());
+			if (pvw.hidden) { info.textContent = kind === 'gif' && a.fx === 'orig' ? 'Como está: a imagem aparece com a animação dela.' : ''; return; }
+			if (a.txt.trim() && isBad(a.txt)) { info.textContent = 'Essa palavra não pode aparecer. Escolhe outra!'; return; }
+			a.frames = GM.frames({ W: w, H: h, sprite: sp, fx: a.fx === 'orig' ? 'still' : a.fx, text: a.txt, c1: rgb(a.c1), bg: rgb(a.bg) });
+			a.bytes = GM.encode(a.frames, w, h, a.spd);
+			if (a.bytes.length > 60000) { info.textContent = 'Fica grande demais para as luzes. Escolhe outra animação ou um texto mais curto.'; a.bytes = null; }
+		};
+		// preview: the frames drawn as LEDs, at the GIF's own speed
+		let pi = 0, pt = 0;
+		const loop = now => {
+			requestAnimationFrame(loop);
+			if (box.offsetParent === null || pvw.hidden || !a.frames.length || now - pt < a.spd) return;
+			pt = now; pi = (pi + 1) % a.frames.length;
+			const [w, h] = sizeNow(), cell = Math.max(3, Math.floor(Math.min(300, (box.clientWidth || 300) - 20) / Math.max(w, h)));
+			if (cv.width !== cell * w * 2) { cv.width = cell * w * 2; cv.height = cell * h * 2; cv.style.width = cell * w + 'px'; cv.style.height = cell * h + 'px'; }
+			const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, cell * w, cell * h);
+			const f = a.frames[pi] || a.frames[0]; if (!f || f.length !== w * h) return;
+			for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = f[y * w + x]; g.fillStyle = c[0] + c[1] + c[2] > 9 ? 'rgb(' + c + ')' : '#15161c'; g.beginPath(); g.arc(x * cell + cell / 2, y * cell + cell / 2, cell * .42, 0, 6.283); g.fill(); }
+		};
+		requestAnimationFrame(loop);
+		drawChips();
+		return a;
+	};
+	const gifA = animBox($('gifAnim'), 'gif'), drawA = animBox($('drawAnim'), 'draw');
+	// the picture of the chosen GIF (the frame with most LEDs on), or the drawing, as the sprite to animate
+	let spriteFor = '';
+	const loadGifSprite = async () => {
+		if (!GM || !gif || spriteFor === gif) return gifA.build && gifA.build();
+		spriteFor = gif;
+		try { const px = await GM.loadSprite('../gifs/' + gif); if (spriteFor === gif) gifA.sprite = { w: 16, h: 16, px }; } catch (e) { gifA.sprite = null; }
+		gifA.build();
+	};
+	const drawSprite = () => { if (!GM) return; drawA.sprite = pixels.some(v => v) ? { w: gw, h: gh, px: pixels.map(v => v ? rgb(v) : null) } : null; drawA.build(); };
 
 	// ---- sides of the cube ----
 	const drawFaces = () => {
@@ -326,7 +392,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		const opts = (sameSize ? [[-1, 'Todos os lados']] : []).concat(cfg.faces.map((f, i) => [i, f.n || 'Lado ' + (i + 1)]));
 		$('faces').replaceChildren(...opts.map(([v, t]) => {
 			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = t; b.setAttribute('aria-pressed', String(v === face));
-			b.onclick = () => { face = v; drawFaces(); buildGrid(); };
+			b.onclick = () => { face = v; drawFaces(); buildGrid(); if (typeof drawSprite === 'function') { drawSprite(); gifA.build && gifA.build(); } };
 			return b;
 		}));
 	};
@@ -355,7 +421,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		else { $('send').disabled = closed; $('send').textContent = 'Mostrar nas luzes!'; }
 	}
 	$('send').onclick = async () => {
-		let body;
+		let body, anim = null;
 		if (tab === 'text') {
 			const t = chosenText().slice(0, 40);
 			if (!t) { say('Escolhe ou escreve uma mensagem.', 'err'); return; }
@@ -364,6 +430,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		} else if (tab === 'gif') {
 			if (!gif) { say('Escolhe primeiro uma imagem.', 'err'); return; }
 			body = { k: 'gif', f: gif };
+			if (gifA.made && gifA.made()) anim = gifA;
 		} else if (tab === 'fx') {
 			if (!fx) { say('Escolhe primeiro um efeito.', 'err'); return; }
 			body = fx.startsWith('e:') ? { k: 'fx', e: fx.slice(2) } : { k: 'fx', n: fx.slice(2) };
@@ -371,11 +438,23 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		} else {
 			if (!pixels.some(v => v)) { say('Faz primeiro um desenho.', 'err'); return; }
 			body = { k: 'draw', w: gw, h: gh, p: pixels.join('') };
+			if (drawA.made && drawA.made()) anim = drawA;
 		}
 		body.z = face;
+		let req = { method: 'POST', body: JSON.stringify(body) }, url = RELAY + TOPIC;
+		if (anim) {
+			// v16: an animated picture or drawing goes as a GIF attached to the message (the bridge puts it on the lights)
+			if (anim.txt.trim() && isBad(anim.txt)) { say('Essa palavra não pode aparecer. Escolhe outra!', 'err'); return; }
+			anim.build();
+			if (!anim.bytes) { say('Não foi possível fazer a animação. Escolhe outra ou um texto mais curto.', 'err'); return; }
+			const [w, h] = sizeNow();
+			const meta = { k: 'gifx', z: face, w, h, fx: anim.fx, t: anim.txt.trim().slice(0, 20), src: tab === 'gif' ? gif : 'desenho' };
+			url = RELAY + TOPIC + '?filename=cubo.gif&message=' + encodeURIComponent(JSON.stringify(meta));
+			req = { method: 'POST', body: new Blob([anim.bytes]) };
+		}
 		$('send').disabled = true;
 		try {
-			const r = await fetch(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(body) });
+			const r = await fetch(url, req);
 			if (!r.ok) throw new Error(r.status);
 			try { localStorage.setItem('l4yShowSent', String(Date.now())); } catch (e) {}
 			say('Enviado! Olha para as luzes: aparece daqui a pouco.', 'ok');

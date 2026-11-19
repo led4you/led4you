@@ -1694,6 +1694,63 @@
 		await im.decode(); g.clearRect(0, 0, N, N); g.drawImage(im, 0, 0, N, N); URL.revokeObjectURL(im.src);
 		return read().px;
 	}
+	// the frames of a made GIF: o = { W, H, sprite: { w, h, px: [[r,g,b] | null] } | null, fx, text, c1: [r,g,b], bg: [r,g,b] }
+	function gmFrames(o) {
+		const W = o.W, H = o.H;
+		const BG = o.bg, C1 = o.c1, fx = o.fx, sprite = o.sprite, text = (o.text || '').trim().toUpperCase();
+		const glyphs = Array.from(text).map(ch => F35[ch.normalize('NFD').charAt(0)] || F35['?']);
+		const tScale = !sprite && H >= 12 ? Math.max(1, Math.floor(H / 8)) : 1;  // only text: bigger letters
+		const tw = glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
+		const scroll = tw > W;
+		const ty = sprite ? H - 5 * tScale - (H >= 20 ? 1 : 0) : Math.floor((H - 5 * tScale) / 2);
+		// the picture fits the matrix (whole pixels when it grows); with a text under it, it fits above the text
+		const sw0 = sprite ? sprite.w : 16, sh0 = sprite ? sprite.h : 16, availH = sprite && glyphs.length ? Math.max(6, ty - 1) : H;
+		let sc0 = Math.min(W / sw0, availH / sh0); if (sc0 >= 1) sc0 = Math.floor(sc0);
+		const dw = Math.max(1, Math.round(sw0 * sc0)), dh = Math.max(1, Math.round(sh0 * sc0));
+		const dx0 = Math.floor((W - dw) / 2), dy0 = Math.floor((availH - dh) / 2);
+		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: W + dw, grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
+		if (scroll) N = Math.max(N, tw + W + 2);
+		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
+		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * (W - 5)), R() * (H + 6)]);
+		const frames = [];
+		for (let i = 0; i < N; i++) {
+			const tt = i / N, f = new Array(W * H).fill(null).map(() => BG.slice());
+			const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) f[y * W + x] = c; };
+			if (fx === 'snow') for (const [x, y0, sp] of flakes) put(x, Math.floor((y0 + tt * H * sp) % H), [235, 240, 255]);
+			if (fx === 'hearts') for (const [x0, y0] of hearts) { const y = Math.floor(H - ((y0 + tt * (H + 6)) % (H + 6))); HEART.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1') put(x0 + rx, y + ry, C1); })); }
+			if (fx === 'sparkle') { const Rf = rnd(100 + i); for (let s = 0; s < Math.round(W * H / 22); s++) { const x = Math.floor(Rf() * W), y = Math.floor(Rf() * H), v = Rf(); put(x, y, C1.map(c => c * (0.35 + 0.65 * v) | 0)); } }
+			const off = fx === 'blink' && i >= N / 2;
+			let dx = 0, dy = 0, sc = 1, mul = 1;
+			if (fx === 'bounce') dy = -Math.round(Math.abs(Math.sin(Math.PI * tt)) * Math.max(1, Math.round(H / 8)));
+			if (fx === 'shake') { const Rs = rnd(30 + i); dx = Math.round(Rs() * 2 - 1); dy = Math.round(Rs() * 2 - 1); }
+			if (fx === 'grow') sc = Math.min(1, 0.15 + 0.85 * Math.min(1, tt / 0.7));
+			if (fx === 'pulse') mul = 0.25 + 0.75 * (0.5 + 0.5 * Math.cos(2 * Math.PI * tt));
+			if (sprite && !off) {
+				if (fx === 'slide') dx = W - dx0 - Math.round(tt * (W + dw));
+				const band = (tt * (W + H + 8)) - 4;
+				for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
+					let sxp = x, syp = y;
+					if (sc < 1) { sxp = Math.floor((x - dw / 2) / sc + dw / 2); syp = Math.floor((y - dh / 2) / sc + dh / 2); if (sxp < 0 || syp < 0 || sxp >= dw || syp >= dh) continue; }
+					let c = sprite.px[Math.floor(syp * sh0 / dh) * sw0 + Math.floor(sxp * sw0 / dw)];
+					if (!c) continue;
+					if (fx === 'rainbow') { const [hh, s, v] = rgb2hsv(c); c = hsv2rgb((hh + tt) % 1, Math.max(s, 0.6), Math.max(v, 0.6)); }
+					if (fx === 'shine') { const d = Math.abs((dx0 + x) + (dy0 + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
+					if (mul !== 1) c = c.map(v => v * mul | 0);
+					put(dx0 + x + dx, dy0 + y + dy, c);
+				}
+			}
+			if (glyphs.length && !off) {
+				// with no picture the text itself bounces, shakes or pulses
+				const tdx = sprite ? 0 : dx, tdy = sprite ? 0 : dy, tm = sprite ? 1 : mul;
+				const x0 = (scroll ? W - Math.round(i * (tw + W) / N) : Math.floor((W - tw) / 2)) + tdx;
+				const tc = gi => (fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : C1).map(v => v * tm | 0);
+				glyphs.forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
+					for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) put(x0 + (gi * 4 + gx) * tScale + a, ty + tdy + gy * tScale + b2, tc(gi)); });
+			}
+			frames.push(f);
+		}
+		return frames;
+	}
 	function gifMakerCard(t, toast, base) {
 		let o = { pic: 'hw-pumpkin.gif', fx: 'bounce', txt: '', c1: '#ffd23f', bg: '#000000', spd: 90, size: 0, name: '' };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yGifMaker') || '{}')); } catch (e) {}
@@ -1743,60 +1800,9 @@
 		// one frame: array of W*H [r,g,b]
 		const build = () => {
 			[W, H] = sizes[+sizeSel.value] || sizes[0];
-			const k = Math.max(1, Math.floor(Math.min(W, H) / 16));      // pack pictures are 16×16: 2× on 32×32
-			const sw = 16 * k, sx0 = Math.floor((W - sw) / 2), sy0 = Math.floor((H - sw) / 2);
-			const BG = hexToRgb(bg.value), C1 = hexToRgb(c1.value), fx = fxSel.value;
-			const text = txt.value.trim().toUpperCase();
-			const glyphs = Array.from(text).map(ch => F35[ch.normalize('NFD').charAt(0)] || F35['?']);
-			const tScale = !sprite && H >= 12 ? Math.max(1, Math.floor(H / 8)) : 1;  // only text: bigger letters
-			const tw = glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
-			const scroll = tw > W;
-			const ty = sprite ? H - 5 * tScale - (H >= 20 ? 1 : 0) : Math.floor((H - 5 * tScale) / 2);
-			// with a text under the picture, the picture shrinks to fit above it
-			const ds = sprite && glyphs.length ? Math.max(8, Math.min(sw, ty - 1)) : sw;
-			const dx0 = Math.floor((W - ds) / 2), dy0 = sprite && glyphs.length ? Math.max(0, Math.floor((ty - 1 - ds) / 2)) : Math.floor((H - ds) / 2);
-			let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: W + sw, grow: 20, shine: 24, snow: H, sparkle: 16, hearts: H + 6 }[fx] || 16;
-			if (scroll) N = Math.max(N, tw + W + 2);
 			delay = +spd.value;
-			const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
-			const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * (W - 5)), R() * (H + 6)]);
-			frames = [];
-			for (let i = 0; i < N; i++) {
-				const tt = i / N, f = new Array(W * H).fill(null).map(() => BG.slice());
-				const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) f[y * W + x] = c; };
-				if (fx === 'snow') for (const [x, y0, sp] of flakes) put(x, Math.floor((y0 + tt * H * sp) % H), [235, 240, 255]);
-				if (fx === 'hearts') for (const [x0, y0] of hearts) { const y = Math.floor(H - ((y0 + tt * (H + 6)) % (H + 6))); HEART.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1') put(x0 + rx, y + ry, C1); })); }
-				if (fx === 'sparkle') { const Rf = rnd(100 + i); for (let s = 0; s < Math.round(W * H / 22); s++) { const x = Math.floor(Rf() * W), y = Math.floor(Rf() * H), v = Rf(); put(x, y, C1.map(c => c * (0.35 + 0.65 * v) | 0)); } }
-				const off = fx === 'blink' && i >= N / 2;
-				let dx = 0, dy = 0, sc = 1, mul = 1;
-				if (fx === 'bounce') dy = -Math.round(Math.abs(Math.sin(Math.PI * tt)) * Math.max(1, Math.round(H / 8)));
-				if (fx === 'shake') { const Rs = rnd(30 + i); dx = Math.round(Rs() * 2 - 1); dy = Math.round(Rs() * 2 - 1); }
-				if (fx === 'grow') sc = Math.min(1, 0.15 + 0.85 * Math.min(1, tt / 0.7));
-				if (fx === 'pulse') mul = 0.25 + 0.75 * (0.5 + 0.5 * Math.cos(2 * Math.PI * tt));
-				if (sprite && !off) {
-					if (fx === 'slide') dx = W - dx0 - Math.round(tt * (W + ds));
-					const band = (tt * (W + H + 8)) - 4;
-					for (let y = 0; y < ds; y++) for (let x = 0; x < ds; x++) {
-						let sxp = x, syp = y;
-						if (sc < 1) { sxp = Math.floor((x - ds / 2) / sc + ds / 2); syp = Math.floor((y - ds / 2) / sc + ds / 2); if (sxp < 0 || syp < 0 || sxp >= ds || syp >= ds) continue; }
-						let c = sprite[Math.floor(syp * 16 / ds) * 16 + Math.floor(sxp * 16 / ds)];
-						if (!c) continue;
-						if (fx === 'rainbow') { const [hh, s, v] = rgb2hsv(c); c = hsv2rgb((hh + tt) % 1, Math.max(s, 0.6), Math.max(v, 0.6)); }
-						if (fx === 'shine') { const d = Math.abs((dx0 + x) + (dy0 + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
-						if (mul !== 1) c = c.map(v => v * mul | 0);
-						put(dx0 + x + dx, dy0 + y + dy, c);
-					}
-				}
-				if (glyphs.length && !off) {
-					// with no picture the text itself bounces, shakes or pulses
-					const tdx = sprite ? 0 : dx, tdy = sprite ? 0 : dy, tm = sprite ? 1 : mul;
-					const x0 = (scroll ? W - Math.round(i * (tw + W) / N) : Math.floor((W - tw) / 2)) + tdx;
-					const tc = gi => (fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : C1).map(v => v * tm | 0);
-					glyphs.forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
-						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) put(x0 + (gi * 4 + gx) * tScale + a, ty + tdy + gy * tScale + b2, tc(gi)); });
-				}
-				frames.push(f);
-			}
+			frames = gmFrames({ W, H, sprite: sprite && { w: 16, h: 16, px: sprite }, fx: fxSel.value, text: txt.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
+			const fx = fxSel.value;
 			bytes = gifEncode(frames, W, H, delay);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
@@ -2179,6 +2185,7 @@
 		extrasCards,
 		gifPackCard,
 		gifMakerCard,
+		gm: { encode: gifEncode, frames: gmFrames, loadSprite: gmLoadSprite, FX: GM_FX },
 		zonesCard,
 		gifSeg, fitRow,
 		phoneSound: phoneMic,
