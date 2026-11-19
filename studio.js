@@ -1740,12 +1740,30 @@
 		if (two && has) area.h = Math.max(4, ty2 - 1 - area.y);
 		// each picture in its own cell (side by side, or one under the other in a tall area), fitted with whole pixels when it grows
 		const n = sprites.length, across = area.w >= area.h;
-		const boxes = sprites.map((sp, j) => {
+		// o.fit (v95, like "Picture size" on the board): 'fit' = in proportion, 'stretch' = stretched to its place, 'fill' = filling it (edges cut)
+		const fit = o.fit || 'fit';
+		// stretching or filling: the empty border around the picture is cut first, so the picture itself fills its place
+		const trim = sp => {
+			let x0 = sp.w, y0 = sp.h, x1 = -1, y1 = -1;
+			sp.px.forEach((c, i) => { if (c) { const x = i % sp.w, y = Math.floor(i / sp.w); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } });
+			if (x1 < 0) return sp;
+			const w = x1 - x0 + 1, hh = y1 - y0 + 1, px = [];
+			for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) px.push(sp.px[(y0 + y) * sp.w + x0 + x]);
+			return { w, h: hh, px };
+		};
+		const boxes = sprites.map((sp0, j) => {
+			const sp = (o.fit || 'fit') === 'fit' ? sp0 : trim(sp0);
 			const cw = across ? area.w / n : area.w, ch = across ? area.h : area.h / n;
-			let sc = Math.min(cw / sp.w, ch / sp.h); if (sc >= 1) sc = Math.floor(sc);
-			const dw = Math.max(1, Math.round(sp.w * sc)), dh = Math.max(1, Math.round(sp.h * sc));
 			const cx = area.x + (across ? j * cw : 0), cy = area.y + (across ? 0 : j * ch);
-			return { sp, dw, dh, x: Math.floor(cx + (cw - dw) / 2), y: Math.floor(cy + (ch - dh) / 2) };
+			const clip = { x0: Math.round(cx), y0: Math.round(cy), x1: Math.round(cx + cw), y1: Math.round(cy + ch) };
+			let dw, dh;
+			if (fit === 'stretch') { dw = clip.x1 - clip.x0; dh = clip.y1 - clip.y0; }
+			else {
+				let sc = fit === 'fill' ? Math.max(cw / sp.w, ch / sp.h) : Math.min(cw / sp.w, ch / sp.h);
+				if (sc >= 1 && fit !== 'fill') sc = Math.floor(sc);
+				dw = Math.max(1, Math.round(sp.w * sc)); dh = Math.max(1, Math.round(sp.h * sc));
+			}
+			return { sp, dw, dh, clip: fit === 'fill' ? clip : null, x: Math.floor(cx + (cw - dw) / 2), y: Math.floor(cy + (ch - dh) / 2) };
 		});
 		const groupW = n ? Math.max(...boxes.map(b => b.x + b.dw)) - Math.min(...boxes.map(b => b.x)) : 0;
 		const groupX = n ? Math.min(...boxes.map(b => b.x)) : 0;
@@ -1799,7 +1817,9 @@
 					if (fx === 'rainbow') { const [hh, s, v] = rgb2hsv(c); c = hsv2rgb((hh + tt + j / 4) % 1, Math.max(s, 0.6), Math.max(v, 0.6)); }
 					if (fx === 'shine') { const d = Math.abs((b.x + x) + (b.y + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
 					if (mul !== 1) c = c.map(v => v * mul | 0);
-					put(b.x + x + dx, b.y + y + dy, c);
+					const px = b.x + x + dx, py = b.y + y + dy;
+					if (b.clip && fx !== 'slide' && (px < b.clip.x0 || py < b.clip.y0 || px >= b.clip.x1 || py >= b.clip.y1)) continue;   // edges cut
+					put(px, py, c);
 				}
 			});
 			if (glyphs.length && !off) {
@@ -1857,6 +1877,7 @@
 		const tposSel = h('select', { 'aria-label': 'Where the text goes' }, [['bottom', 'Below'], ['top', 'Above'], ['left', 'On the left (letters one under the other)'], ['right', 'On the right (letters one under the other)'], ['middle', 'Over the picture']].map(([v, n]) => h('option', { value: v }, n)));
 		const fxSel = h('select', { 'aria-label': 'Animation' }, GM_FX.map(([v, n]) => h('option', { value: v }, n)));
 		const bgSel = h('select', { 'aria-label': 'Background effect' }, GM_BG.map(([v, n]) => h('option', { value: v }, n)));
+		const pfitSel = h('select', { 'aria-label': 'Pictures in the GIF' }, [['fit', 'In proportion'], ['stretch', 'Stretched to their place'], ['fill', 'Filling their place (edges cut)']].map(([v, n]) => h('option', { value: v }, n)));
 		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (i === 1 && sizes.length > 2 ? ' (your matrix)' : ''))));
 		const txt = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'Optional: a short text', value: o.txt || '' });
 		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Text and effect colour' });
@@ -1893,12 +1914,12 @@
 		const build = () => {
 			[W, H] = sizes[+sizeSel.value] || sizes[0];
 			delay = +spd.value;
-			frames = gmFrames({ W, H, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
+			frames = gmFrames({ W, H, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, fit: pfitSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
 			const fx = fxSel.value;
 			bytes = gifEncode(frames, W, H, delay);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
-			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, bgfx: bgSel.value, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
+			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, bgfx: bgSel.value, pfit: pfitSel.value, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
 			save();
 		};
 		const setPic = async () => {
@@ -1958,7 +1979,7 @@
 			const a = h('a', { href: URL.createObjectURL(new Blob([bytes], { type: 'image/gif' })), download: fileName() });
 			document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 		};
-		[fxSel, bgSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
+		[fxSel, bgSel, pfitSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
 		pic2Sel.onchange = pic3Sel.onchange = setPic;
 		spd.addEventListener('input', build);
 		txt.oninput = build;
@@ -1966,6 +1987,7 @@
 		picSel.onchange = setPic;
 		fxSel.value = o.fx; if (!fxSel.value) fxSel.value = 'bounce';
 		bgSel.value = o.bgfx || '';
+		pfitSel.value = o.pfit || 'fit';
 		sizeSel.value = String(Math.min(o.size || 0, sizes.length - 1));
 		tposSel.value = o.tpos || 'bottom';
 		drawGrid();
@@ -1982,6 +2004,7 @@
 			h('label', { class: 'fld' }, h('span', {}, 'Picture'), picSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Second picture (optional)'), pic2Sel),
 			h('label', { class: 'fld' }, h('span', {}, 'Third picture (optional)'), pic3Sel),
+			h('label', { class: 'fld' }, h('span', {}, 'Pictures in the GIF'), pfitSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Animation'), fxSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Text'), txt),

@@ -12,6 +12,9 @@
 	const T = [
 		// --- Make a GIF (GIF maker in the Images tab) ---
 		['Make a GIF', 'Criar um GIF', 'Crear un GIF', 'Créer un GIF'],
+		['Pictures in the GIF', 'Desenhos no GIF', 'Dibujos en el GIF', 'Images dans le GIF'],
+		['Stretched to their place', 'Esticados ao seu espaço', 'Estirados a su espacio', 'Étirées à leur place'],
+		['Filling their place (edges cut)', 'A encher o seu espaço (cortam-se as pontas)', 'Llenando su espacio (se cortan los bordes)', 'Remplissant leur place (bords coupés)'],
 		['Background effect', 'Efeito de fundo', 'Efecto de fondo', 'Effet de fond'],
 		['Nothing', 'Nenhum', 'Ninguno', 'Aucun'],
 		['Twinkling stars', 'Estrelas a piscar', 'Estrellas que brillan', 'Étoiles scintillantes'],
