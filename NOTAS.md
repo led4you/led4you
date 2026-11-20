@@ -88,3 +88,5 @@ A página dos visitantes (`show/index.html`) só precisa de push.
 - Sistema de fotos no cubo (câmara no Pi, fotos guardadas só no Pi; atenção ao RGPD com crianças).
 - Cubo noutra rede: aparelho com a ponte nessa rede (recomendado) ou MQTT só no ESP32 clássico.
 - Pausar o cubo enquanto o FPP toca o show (MQTT do FPP, só na ponte).
+
+- App v98: novo cartão "Texto com animação" no separador Texto (Bluetooth): em cima / ao meio / em baixo / duas linhas, cor e direção por linha, movimento, efeito de fundo, cor de fundo, velocidade. Gera GIF no telemóvel e envia como l4y-texto-a/b.gif (alterna).

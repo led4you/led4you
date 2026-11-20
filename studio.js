@@ -204,6 +204,98 @@
 			h('button', { class: 'btn primary', type: 'button', onclick: () => send(false) }, 'Show text'));
 	}
 
+	// ---------- v98: text as a GIF made on the phone: on top / in the middle / at the bottom / two lines,
+	// each line with its colour and side, a movement and a background effect (the same as in the cube) ----------
+	function textGifCard(t, toast) {
+		const inf = t.info();
+		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'left', d2: 'right', fx: 'slide', bgfx: 'snow', bg: '#000000', spd: 90 };
+		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yTextGif') || '{}')); } catch (e) {}
+		const save = () => { try { localStorage.setItem('l4yTextGif', JSON.stringify(o)); } catch (e) {} };
+		const W = inf.mw && inf.mh ? Math.min(64, inf.mw) : 16, H = inf.mw && inf.mh ? Math.min(64, inf.mh) : 16;
+		const t1 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'FELIZ', value: o.t1 });
+		const t2 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'NATAL', value: o.t2 });
+		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Colour of the top line' });
+		const c2 = h('input', { type: 'color', class: 'colbtn', value: o.c2, 'aria-label': 'Colour of the bottom line' });
+		const bg = h('input', { type: 'color', class: 'colbtn', value: o.bg, 'aria-label': 'Background colour' });
+		const sel = (list, v, label) => { const s = h('select', { 'aria-label': label }, list.map(([k, n]) => h('option', { value: k }, n))); s.value = v; return s; };
+		const pos = sel([['top', 'On top'], ['middle', 'In the middle'], ['bottom', 'At the bottom'], ['two', 'Two lines']], o.pos, 'Where the text goes');
+		const DIRS2 = [['left', 'To the left'], ['right', 'To the right']];
+		const d1 = sel(DIRS2, o.d1, 'Where the top line goes'), d2 = sel(DIRS2, o.d2, 'Where the bottom line goes');
+		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
+		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
+		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), prog = h('div', { class: 'note' });
+		const sendBtn = h('button', { class: 'btn primary', type: 'button' }, 'Show on the lights');
+		const line2 = [h('label', { class: 'fld' }, h('span', {}, 'Bottom line'), t2), h('label', { class: 'fld' }, h('span', {}, 'The bottom line goes'), d2),
+			h('label', { class: 'gmcol' }, c2, h('span', {}, 'Colour of the bottom line'))];
+		const d1lab = h('span', {}, 'The text goes'), c1lab = h('span', {}, 'Text colour');
+		let frames = [], bytes = null, turn = 0;
+		const build = () => {
+			o = { t1: t1.value, t2: t2.value, pos: pos.value, c1: c1.value, c2: c2.value, d1: d1.value, d2: d2.value, fx: fx.value, bgfx: bgfx.value, bg: bg.value, spd: +spd.value };
+			save();
+			const two = o.pos === 'two';
+			line2.forEach(e => e.hidden = !two);
+			d1lab.textContent = two ? 'The top line goes' : 'The text goes';
+			c1lab.textContent = two ? 'Colour of the top line' : 'Text colour';
+			bytes = null; frames = [];
+			if (!o.t1.trim() && !(two && o.t2.trim())) { info.textContent = 'Type a message first.'; sendBtn.disabled = true; return; }
+			frames = gmFrames({ W, H, delay: o.spd, sprites: [], fx: o.fx, bgfx: o.bgfx, text: o.t1, text2: two ? o.t2 : '', tpos: two ? 'top' : o.pos,
+				c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, bg: hexToRgb(o.bg) });
+			bytes = gifEncode(frames, W, H, o.spd);
+			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
+			sendBtn.disabled = bytes.length > 65536;
+		};
+		let pi = 0, pt = 0;
+		const pv = now => {
+			if (!cv.isConnected && pv.seen) return;
+			requestAnimationFrame(pv);
+			if (!cv.isConnected || !frames.length) return;
+			pv.seen = true;
+			if (now - pt < o.spd) return; pt = now; pi = (pi + 1) % frames.length;
+			const w = Math.min((cv.parentElement.clientWidth || 336) - 16, 360), cell = Math.max(3, Math.floor(w / W)), CW = cell * W, CH = cell * H;
+			if (cv.width !== CW * 2 || cv.height !== CH * 2) { cv.width = CW * 2; cv.height = CH * 2; cv.style.width = CW + 'px'; cv.style.height = CH + 'px'; }
+			const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.fillStyle = '#05060a'; g.fillRect(0, 0, CW, CH);
+			const f = frames[pi] || frames[0];
+			for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const c = f[y * W + x]; g.fillStyle = c[0] + c[1] + c[2] > 9 ? 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')' : '#151823';
+				g.beginPath(); g.arc(x * cell + cell / 2, y * cell + cell / 2, cell * .4, 0, 6.283); g.fill(); }
+		};
+		requestAnimationFrame(pv);
+		// on the lights: always the same two files (l4y-texto-a/b.gif), so they never fill up
+		sendBtn.onclick = async () => {
+			build(); if (!bytes) return;
+			turn = 1 - turn;
+			const name = 'l4y-texto-' + 'ab'[turn] + '.gif';
+			sendBtn.disabled = true;
+			try {
+				const ok = await t.upload(name, bytes, 0, p => { prog.textContent = 'Sending… ' + Math.round(p * 100) + '%'; });
+				if (!ok) throw new Error('upload');
+				gifWarn(t, toast);
+				await t.send({ on: true, seg: segOut(t, gifSeg(name)), l4y: { cd: { on: false } } });
+				prog.textContent = ''; toast('Showing your text.');
+			} catch (e) { prog.textContent = 'Could not send the text. If the lights are full, delete a GIF you no longer use.'; }
+			sendBtn.disabled = false;
+		};
+		[t1, t2].forEach(e => e.addEventListener('input', build));
+		[pos, d1, d2, fx, bgfx, c1, c2, bg].forEach(e => { e.addEventListener('input', build); e.addEventListener('change', build); });
+		spd.addEventListener('input', build);
+		build();
+		return h('section', { class: 'card' },
+			h('div', { class: 'ct' }, 'Text with animation'),
+			h('div', { class: 'note' }, 'On top, in the middle, at the bottom or in two lines, with a movement and a background (snow, stars…). It is made on this phone and goes to the lights as a GIF.'),
+			inf.mw && inf.mh ? '' : h('div', { class: 'note warnline' }, 'Text needs a matrix. Set the matrix size in LED setup first.'),
+			targetBar(t),
+			h('label', { class: 'fld' }, h('span', {}, 'Where the text goes'), pos),
+			h('label', { class: 'fld' }, h('span', {}, 'Message'), t1),
+			h('label', { class: 'fld' }, d1lab, d1),
+			h('label', { class: 'gmcol' }, c1, c1lab),
+			...line2,
+			h('label', { class: 'fld' }, h('span', {}, 'Movement'), fx),
+			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgfx),
+			h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background')),
+			h('div', { class: 'lab sp' }, 'Speed (time per frame)'), spd,
+			h('div', { class: 'gmpvwrap' }, cv), info,
+			h('div', { class: 'row' }, sendBtn), prog);
+	}
+
 	// ---------- My LEDs ----------
 	// The editor works on the whole lights, or on the zone chosen under "Send to" (that zone gets its own design,
 	// stored on the lights as mylz<zone>.bin; the whole lights use myleds.bin).
@@ -2332,6 +2424,7 @@
 		extrasCards,
 		gifPackCard,
 		gifMakerCard,
+		textGifCard,
 		gm: { encode: gifEncode, frames: gmFrames, loadSprite: gmLoadSprite, FX: GM_FX, BG: GM_BG, TEXTGIF: GM_TEXTGIF },
 		zonesCard,
 		gifSeg, fitRow,
