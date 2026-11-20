@@ -1990,6 +1990,9 @@
 		const fxSel = h('select', { 'aria-label': 'Animation' }, GM_FX.map(([v, n]) => h('option', { value: v }, n)));
 		const bgSel = h('select', { 'aria-label': 'Background effect' }, GM_BG.map(([v, n]) => h('option', { value: v }, n)));
 		const pfitSel = h('select', { 'aria-label': 'Pictures in the GIF' }, [['fit', 'In proportion'], ['stretch', 'Stretched to their place'], ['fill', 'Filling their place (edges cut)']].map(([v, n]) => h('option', { value: v }, n)));
+		// v99: several pictures move together (default) or take turns, as in the cube
+		const turnSel = h('select', { 'aria-label': 'The pictures move' }, [['0', 'At the same time'], ['1', 'Taking turns']].map(([v, n]) => h('option', { value: v }, n)));
+		const turnFld = h('label', { class: 'fld' }, h('span', {}, 'The pictures move'), turnSel);
 		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (i === 1 && sizes.length > 2 ? ' (your matrix)' : ''))));
 		const txt = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'Optional: a short text', value: o.txt || '' });
 		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Text and effect colour' });
@@ -2026,12 +2029,13 @@
 		const build = () => {
 			[W, H] = sizes[+sizeSel.value] || sizes[0];
 			delay = +spd.value;
-			frames = gmFrames({ W, H, delay, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, fit: pfitSel.value, text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
+			frames = gmFrames({ W, H, delay, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, fit: pfitSel.value, turns: turnSel.value === '1', text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
 			const fx = fxSel.value;
+			turnFld.hidden = sprites.length < 2 || !['bounce', 'pulse', 'shake'].includes(fx);
 			bytes = gifEncode(frames, W, H, delay);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
-			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, bgfx: bgSel.value, pfit: pfitSel.value, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
+			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, bgfx: bgSel.value, pfit: pfitSel.value, turns: turnSel.value, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
 			save();
 		};
 		const setPic = async () => {
@@ -2091,7 +2095,7 @@
 			const a = h('a', { href: URL.createObjectURL(new Blob([bytes], { type: 'image/gif' })), download: fileName() });
 			document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 		};
-		[fxSel, bgSel, pfitSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
+		[fxSel, bgSel, pfitSel, turnSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
 		pic2Sel.onchange = pic3Sel.onchange = setPic;
 		spd.addEventListener('input', build);
 		txt.oninput = build;
@@ -2100,6 +2104,7 @@
 		fxSel.value = o.fx; if (!fxSel.value) fxSel.value = 'bounce';
 		bgSel.value = o.bgfx || '';
 		pfitSel.value = o.pfit || 'fit';
+		turnSel.value = o.turns === '1' ? '1' : '0';
 		sizeSel.value = String(Math.min(o.size || 0, sizes.length - 1));
 		tposSel.value = o.tpos || 'bottom';
 		drawGrid();
@@ -2117,6 +2122,7 @@
 			h('label', { class: 'fld' }, h('span', {}, 'Second picture (optional)'), pic2Sel),
 			h('label', { class: 'fld' }, h('span', {}, 'Third picture (optional)'), pic3Sel),
 			h('label', { class: 'fld' }, h('span', {}, 'Pictures in the GIF'), pfitSel),
+			turnFld,
 			h('label', { class: 'fld' }, h('span', {}, 'Animation'), fxSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgSel),
 			h('label', { class: 'fld' }, h('span', {}, 'Text'), txt),

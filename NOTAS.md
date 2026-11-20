@@ -90,3 +90,4 @@ A página dos visitantes (`show/index.html`) só precisa de push.
 - Pausar o cubo enquanto o FPP toca o show (MQTT do FPP, só na ponte).
 
 - App v98: novo cartão "Texto com animação" no separador Texto (Bluetooth): em cima / ao meio / em baixo / duas linhas, cor e direção por linha, movimento, efeito de fundo, cor de fundo, velocidade. Gera GIF no telemóvel e envia como l4y-texto-a/b.gif (alterna).
+- App v99: Criar um GIF ganhou "As imagens mexem: ao mesmo tempo / à vez" (como no cubo), com 2+ imagens e Saltar/Pulsar/Tremer.
