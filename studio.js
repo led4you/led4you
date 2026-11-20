@@ -211,9 +211,10 @@
 		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'stay', d2: 'stay', fx: 'still', bgfx: 'snow', bg: '#000000', spd: 90, ts: 'auto' };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yTextGif') || '{}')); } catch (e) {}
 		const save = () => { try { localStorage.setItem('l4yTextGif', JSON.stringify(o)); } catch (e) {} };
-		// v104: made at the size of the matrix (any size; above 128 it keeps the shape at 128 at most). If the GIF goes
-		// over the 64 KB the lights accept, it is made smaller (half, then a quarter…) and the lights enlarge it
-		const MW = inf.mw && inf.mh ? inf.mw : 16, MH = inf.mw && inf.mh ? inf.mh : 16, k0 = Math.min(1, 128 / Math.max(MW, MH));
+		// v105: made at the size of the matrix, whatever it is. If the GIF goes over the 64 KB the lights accept, it is made
+		// smaller (half, then a quarter…, same shape) and the lights enlarge it. Very big matrices start smaller straight
+		// away (a GIF of more than 128×128 points could never stay under 64 KB with movement, and would be slow to make)
+		const MW = inf.mw && inf.mh ? inf.mw : 16, MH = inf.mw && inf.mh ? inf.mh : 16, k0 = Math.min(1, Math.sqrt(16384 / (MW * MH)));
 		const W0 = Math.max(8, Math.round(MW * k0)), H0 = Math.max(8, Math.round(MH * k0));
 		let W = W0, H = H0;
 		const t1 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'FELIZ', value: o.t1 });
@@ -2037,11 +2038,12 @@
 		let sprites = [], frames = [], W = 16, H = 16, delay = 90, bytes = null;
 		const spCache = {};
 		const inf = t.info();
-		// v104: 16×16, the size of your matrix (any size up to 128×128), 32×32 and 64×64. A GIF smaller than the matrix
-		// is enlarged by the lights; the file must stay under 64 KB, so big sizes suit short animations
-		const sizes = [[16, 16]], mine = inf.mw && inf.mh && inf.mw <= 128 && inf.mh <= 128 ? [inf.mw, inf.mh] : null;
-		if (mine && !(mine[0] === 16 && mine[1] === 16)) sizes.push(mine);
-		[[32, 32], [64, 64]].forEach(z => { if (!sizes.some(s => s[0] === z[0] && s[1] === z[1])) sizes.push(z); });
+		// v105: 16×16, the size of your matrix (whatever it is), half of it (same shape) and 32×32. A GIF smaller than
+		// the matrix is enlarged by the lights; the file must stay under 64 KB, so big sizes suit short animations
+		const sizes = [[16, 16]], mine = inf.mw && inf.mh ? [inf.mw, inf.mh] : null;
+		const add = z => { if (!sizes.some(s => s[0] === z[0] && s[1] === z[1])) sizes.push(z); };
+		if (mine) { add(mine); if (mine[0] > 32 || mine[1] > 32) add([Math.max(8, Math.round(mine[0] / 2)), Math.max(8, Math.round(mine[1] / 2))]); }
+		add([32, 32]);
 		const picSel = h('select', { 'aria-label': 'Picture' }, h('option', { value: '' }, 'No picture (only text and effect)'), h('option', { value: '*draw' }, 'My drawing'));
 		// v90: up to 3 pictures side by side (a candy cane and a tree…)
 		const pic2Sel = h('select', { 'aria-label': 'Second picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
