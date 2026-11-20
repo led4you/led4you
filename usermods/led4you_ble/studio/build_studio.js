@@ -3,7 +3,13 @@
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 const dir = __dirname;
 let html = fs.readFileSync(path.join(dir, 'studio.htm'), 'utf8');
-const js = fs.readFileSync(path.join(dir, 'studio.js'), 'utf8');
+let js = fs.readFileSync(path.join(dir, 'studio.js'), 'utf8');
+// v104: studio.js is minified (terser comes with html-minifier-terser from npm ci): ~17 KB less flash.
+// The English strings stay as they are (the translations look them up), only names and spaces change.
+(async () => {
+let terser = null;
+try { terser = require('terser'); } catch (e) { console.log('terser not found: run npm ci (studio.js is embedded unminified)'); }
+if (terser) js = (await terser.minify(js, { compress: { passes: 2 }, mangle: true, format: { comments: false } })).code;
 const i18n = fs.readFileSync(path.join(dir, 'i18n.js'), 'utf8');
 html = html.replace('<script src="studio.js"></script>', () => '<script>' + js + '</script>');
 html = html.replace('<script src="i18n.js"></script>', () => '<script>' + i18n + '</script>');
@@ -28,3 +34,4 @@ console.log('html_studio.h: ' + html.length + ' bytes -> ' + gz.length + ' gzipp
   fs.writeFileSync(path.join(dir, '..', 'js_l4ylang.h'), o);
   console.log('js_l4ylang.h: ' + lj.length + ' bytes -> ' + g.length + ' gzipped');
 }
+})();

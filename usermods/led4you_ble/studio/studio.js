@@ -204,6 +204,98 @@
 			h('button', { class: 'btn primary', type: 'button', onclick: () => send(false) }, 'Show text'));
 	}
 
+	// ---------- v98: text as a GIF made on the phone: on top / in the middle / at the bottom / two lines,
+	// each line with its colour and side, a movement and a background effect (the same as in the cube) ----------
+	function textGifCard(t, toast) {
+		const inf = t.info();
+		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'left', d2: 'right', fx: 'slide', bgfx: 'snow', bg: '#000000', spd: 90 };
+		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yTextGif') || '{}')); } catch (e) {}
+		const save = () => { try { localStorage.setItem('l4yTextGif', JSON.stringify(o)); } catch (e) {} };
+		const W = inf.mw && inf.mh ? Math.min(64, inf.mw) : 16, H = inf.mw && inf.mh ? Math.min(64, inf.mh) : 16;
+		const t1 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'FELIZ', value: o.t1 });
+		const t2 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'NATAL', value: o.t2 });
+		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Colour of the top line' });
+		const c2 = h('input', { type: 'color', class: 'colbtn', value: o.c2, 'aria-label': 'Colour of the bottom line' });
+		const bg = h('input', { type: 'color', class: 'colbtn', value: o.bg, 'aria-label': 'Background colour' });
+		const sel = (list, v, label) => { const s = h('select', { 'aria-label': label }, list.map(([k, n]) => h('option', { value: k }, n))); s.value = v; return s; };
+		const pos = sel([['top', 'On top'], ['middle', 'In the middle'], ['bottom', 'At the bottom'], ['two', 'Two lines']], o.pos, 'Where the text goes');
+		const DIRS2 = [['left', 'To the left'], ['right', 'To the right']];
+		const d1 = sel(DIRS2, o.d1, 'Where the top line goes'), d2 = sel(DIRS2, o.d2, 'Where the bottom line goes');
+		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
+		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
+		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), prog = h('div', { class: 'note' });
+		const sendBtn = h('button', { class: 'btn primary', type: 'button' }, 'Show on the lights');
+		const line2 = [h('label', { class: 'fld' }, h('span', {}, 'Bottom line'), t2), h('label', { class: 'fld' }, h('span', {}, 'The bottom line goes'), d2),
+			h('label', { class: 'gmcol' }, c2, h('span', {}, 'Colour of the bottom line'))];
+		const d1lab = h('span', {}, 'The text goes'), c1lab = h('span', {}, 'Text colour');
+		let frames = [], bytes = null, turn = 0;
+		const build = () => {
+			o = { t1: t1.value, t2: t2.value, pos: pos.value, c1: c1.value, c2: c2.value, d1: d1.value, d2: d2.value, fx: fx.value, bgfx: bgfx.value, bg: bg.value, spd: +spd.value };
+			save();
+			const two = o.pos === 'two';
+			line2.forEach(e => e.hidden = !two);
+			d1lab.textContent = two ? 'The top line goes' : 'The text goes';
+			c1lab.textContent = two ? 'Colour of the top line' : 'Text colour';
+			bytes = null; frames = [];
+			if (!o.t1.trim() && !(two && o.t2.trim())) { info.textContent = 'Type a message first.'; sendBtn.disabled = true; return; }
+			frames = gmFrames({ W, H, delay: o.spd, sprites: [], fx: o.fx, bgfx: o.bgfx, text: o.t1, text2: two ? o.t2 : '', tpos: two ? 'top' : o.pos,
+				c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, bg: hexToRgb(o.bg) });
+			bytes = gifEncode(frames, W, H, o.spd);
+			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
+			sendBtn.disabled = bytes.length > 65536;
+		};
+		let pi = 0, pt = 0;
+		const pv = now => {
+			if (!cv.isConnected && pv.seen) return;
+			requestAnimationFrame(pv);
+			if (!cv.isConnected || !frames.length) return;
+			pv.seen = true;
+			if (now - pt < o.spd) return; pt = now; pi = (pi + 1) % frames.length;
+			const w = Math.min((cv.parentElement.clientWidth || 336) - 16, 360), cell = Math.max(3, Math.floor(w / W)), CW = cell * W, CH = cell * H;
+			if (cv.width !== CW * 2 || cv.height !== CH * 2) { cv.width = CW * 2; cv.height = CH * 2; cv.style.width = CW + 'px'; cv.style.height = CH + 'px'; }
+			const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.fillStyle = '#05060a'; g.fillRect(0, 0, CW, CH);
+			const f = frames[pi] || frames[0];
+			for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const c = f[y * W + x]; g.fillStyle = c[0] + c[1] + c[2] > 9 ? 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')' : '#151823';
+				g.beginPath(); g.arc(x * cell + cell / 2, y * cell + cell / 2, cell * .4, 0, 6.283); g.fill(); }
+		};
+		requestAnimationFrame(pv);
+		// on the lights: always the same two files (l4y-texto-a/b.gif), so they never fill up
+		sendBtn.onclick = async () => {
+			build(); if (!bytes) return;
+			turn = 1 - turn;
+			const name = 'l4y-texto-' + 'ab'[turn] + '.gif';
+			sendBtn.disabled = true;
+			try {
+				const ok = await t.upload(name, bytes, 0, p => { prog.textContent = 'Sending… ' + Math.round(p * 100) + '%'; });
+				if (!ok) throw new Error('upload');
+				gifWarn(t, toast);
+				await t.send({ on: true, seg: segOut(t, gifSeg(name)), l4y: { cd: { on: false } } });
+				prog.textContent = ''; toast('Showing your text.');
+			} catch (e) { prog.textContent = 'Could not send the text. If the lights are full, delete a GIF you no longer use.'; }
+			sendBtn.disabled = false;
+		};
+		[t1, t2].forEach(e => e.addEventListener('input', build));
+		[pos, d1, d2, fx, bgfx, c1, c2, bg].forEach(e => { e.addEventListener('input', build); e.addEventListener('change', build); });
+		spd.addEventListener('input', build);
+		build();
+		return h('section', { class: 'card' },
+			h('div', { class: 'ct' }, 'Text with animation'),
+			h('div', { class: 'note' }, 'On top, in the middle, at the bottom or in two lines, with a movement and a background (snow, stars…). It is made on this phone and goes to the lights as a GIF.'),
+			inf.mw && inf.mh ? '' : h('div', { class: 'note warnline' }, 'Text needs a matrix. Set the matrix size in LED setup first.'),
+			targetBar(t),
+			h('label', { class: 'fld' }, h('span', {}, 'Where the text goes'), pos),
+			h('label', { class: 'fld' }, h('span', {}, 'Message'), t1),
+			h('label', { class: 'fld' }, d1lab, d1),
+			h('label', { class: 'gmcol' }, c1, c1lab),
+			...line2,
+			h('label', { class: 'fld' }, h('span', {}, 'Movement'), fx),
+			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgfx),
+			h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background')),
+			h('div', { class: 'lab sp' }, 'Speed (time per frame)'), spd,
+			h('div', { class: 'gmpvwrap' }, cv), info,
+			h('div', { class: 'row' }, sendBtn), prog);
+	}
+
 	// ---------- My LEDs ----------
 	// The editor works on the whole lights, or on the zone chosen under "Send to" (that zone gets its own design,
 	// stored on the lights as mylz<zone>.bin; the whole lights use myleds.bin).
@@ -1616,6 +1708,435 @@
 		return card;
 	}
 
+	// ---------- GIF maker: a picture + an animation + a short text, made into a GIF on the phone ----------
+	// a small GIF89a writer (global palette, LZW), enough for LED-sized animations
+	function gifEncode(frames, W, H, delayMs) {
+		const key = c => (c[0] << 16) | (c[1] << 8) | c[2];
+		let mask = 0xFFFFFF, cols;
+		for (const m of [0xFFFFFF, 0xFCFCFC, 0xF8F8F8, 0xF0F0F0, 0xE0E0E0, 0xC0C0C0]) {
+			mask = m; cols = new Map();
+			for (const f of frames) for (const c of f) { const k = key(c) & m; if (!cols.has(k)) cols.set(k, cols.size); if (cols.size > 256) break; }
+			if (cols.size <= 256) break;
+		}
+		let bits = 1; while ((1 << bits) < Math.max(2, cols.size)) bits++;
+		const out = [];
+		const b = v => out.push(v & 255), w16 = v => { b(v); b(v >> 8); }, str = s => [...s].forEach(ch => b(ch.charCodeAt(0)));
+		str('GIF89a'); w16(W); w16(H); b(0x80 | ((bits - 1) << 4) | (bits - 1)); b(0); b(0);
+		const pal = new Array(1 << bits).fill(0); cols.forEach((i, k) => { pal[i] = k; });
+		pal.forEach(k => { b(k >> 16); b(k >> 8); b(k); });
+		b(0x21); b(0xFF); b(11); str('NETSCAPE2.0'); b(3); b(1); w16(0); b(0);   // loop forever
+		const cs = Math.max(2, Math.round(delayMs / 10)), minCode = Math.max(2, bits);
+		for (const f of frames) {
+			b(0x21); b(0xF9); b(4); b(0); w16(cs); b(0); b(0);
+			b(0x2C); w16(0); w16(0); w16(W); w16(H); b(0);
+			const idx = f.map(c => cols.get(key(c) & mask));
+			b(minCode);
+			const data = [], clear = 1 << minCode, eoi = clear + 1;
+			let size = minCode + 1, next = eoi + 1, table = new Map(), cur = 0, sh = 0;
+			const emit = c => { cur |= c << sh; sh += size; while (sh >= 8) { data.push(cur & 255); cur >>>= 8; sh -= 8; } };
+			emit(clear);
+			let code = idx[0];
+			for (let i = 1; i < idx.length; i++) {
+				const k = idx[i], tk = (code << 8) | k, got = table.get(tk);
+				if (got !== undefined) { code = got; continue; }
+				emit(code);
+				if (next === 4096) { emit(clear); table = new Map(); size = minCode + 1; next = eoi + 1; }
+				else { if (next >= (1 << size)) size++; table.set(tk, next++); }
+				code = k;
+			}
+			emit(code); emit(eoi);
+			if (sh > 0) data.push(cur & 255);
+			for (let i = 0; i < data.length; i += 255) { const part = data.slice(i, i + 255); b(part.length); part.forEach(b); }
+			b(0);
+		}
+		b(0x3B);
+		return new Uint8Array(out);
+	}
+	// v94: the movement of the picture / text and the background effect are two separate choices
+	const GM_FX = [['still', 'Still'], ['blink', 'Blink'], ['pulse', 'Pulse'], ['rainbow', 'Rainbow colours'], ['bounce', 'Bounce'], ['shake', 'Shake'],
+		['slide', 'Slide across'], ['grow', 'Grow'], ['shine', 'Shine']];
+	const GM_BG = [['', 'Nothing'], ['snow', 'Falling snow'], ['stars', 'Twinkling stars'], ['confetti', 'Confetti'], ['fireworks', 'Fireworks'],
+		['hearts', 'Rising hearts'], ['fire', 'Flames'], ['bats', 'Flying bats'], ['sparkle', 'Sparkles']];
+	const BAT = ['10001', '11011', '01110'];
+	const rgb2hsv = ([r, g, b]) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+		let hh = 0; if (d) hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [((hh / 6) + 1) % 1, mx ? d / mx : 0, mx]; };
+	const hsv2rgb = (hh, s, v) => { const i = Math.floor(hh * 6), f = hh * 6 - i, p = v * (1 - s), q = v * (1 - f * s), u = v * (1 - (1 - f) * s);
+		const [r, g, b] = [[v, u, p], [q, v, p], [p, v, u], [p, q, v], [u, p, v], [v, p, q]][((i % 6) + 6) % 6]; return [r * 255 | 0, g * 255 | 0, b * 255 | 0]; };
+	const rnd = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let x = Math.imul(seed ^ seed >>> 15, 1 | seed); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+	// pack GIFs that are a scrolling text: one frame of them is half a word, so they are not used as pictures to animate
+	const GM_TEXTGIF = new Set(['hw-boo.gif', 'hw-doces.gif', 'xm-hohoho.gif', 'xm-feliznatal.gif', 'xm-boasfestas.gif', 'ev-parabens.gif']);
+	const HEART = ['01010', '11111', '11111', '01110', '00100'];
+	// the picture of a GIF from the pack: the frame with the most lit LEDs (ImageDecoder where the browser has it, else the first frame)
+	async function gmLoadSprite(url) {
+		const N = 16, cv = document.createElement('canvas'); cv.width = N; cv.height = N;
+		const g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false;
+		const read = () => { const d = g.getImageData(0, 0, N, N).data, px = []; let lit = 0;
+			for (let i = 0; i < N * N; i++) { const c = [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]]; const on = d[i * 4 + 3] > 127 && c[0] + c[1] + c[2] > 24; px.push(on ? c : null); if (on) lit++; }
+			return { px, lit }; };
+		const blob = await (await fetch(url)).blob();
+		if (window.ImageDecoder) {
+			try {
+				const dec = new ImageDecoder({ data: await blob.arrayBuffer(), type: 'image/gif' });
+				await dec.tracks.ready;
+				const n = Math.min(dec.tracks.selectedTrack.frameCount || 1, 60);
+				let best = null;
+				const frames = [], delays = [];
+				for (let i = 0; i < n; i++) {
+					const { image } = await dec.decode({ frameIndex: i });
+					g.clearRect(0, 0, N, N); g.drawImage(image, 0, 0, N, N);
+					delays.push(Math.max(20, Math.round((image.duration || 100000) / 1000)));   // µs -> ms
+					image.close();
+					const r = read(); frames.push(r.px); if (!best || r.lit > best.lit) best = r;
+				}
+				// v96: the picture keeps its own animation in the GIFs made from it (px = its fullest frame, px.anim = all of them)
+				if (best) { const px = best.px.slice(); if (frames.length > 1) px.anim = { frames, delays, total: delays.reduce((a, b) => a + b, 0) }; return px; }
+			} catch (e) {}
+		}
+		const im = new Image(); im.src = URL.createObjectURL(blob);
+		await im.decode(); g.clearRect(0, 0, N, N); g.drawImage(im, 0, 0, N, N); URL.revokeObjectURL(im.src);
+		return read().px;
+	}
+	// the frames of a made GIF:
+	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, text2 (a 2nd line at the bottom, colour c2), dir1 / dir2 ('left' | 'right': where each line goes), tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
+	//       c1: [r,g,b], bg: [r,g,b] }   (o.sprite, one picture, still works)
+	function gmFrames(o) {
+		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1, delay = o.delay || 90;
+		// the old single list had the backgrounds among the movements: they still work
+		let fx = o.fx, bgfx = o.bgfx || '';
+		if (['snow', 'sparkle', 'hearts'].includes(fx)) { bgfx = bgfx || fx; fx = 'still'; }
+		const sprites = (o.sprites || (o.sprite ? [o.sprite] : [])).filter(Boolean).slice(0, 3);
+		const toGl = t => Array.from((t || '').trim().toUpperCase()).map(ch => F35[ch.normalize('NFD').charAt(0)] || F35['?']);
+		let glyphs = toGl(o.text), glyphs2 = toGl(o.text2), tp0 = o.tpos || 'bottom';
+		// two texts: the first one on top, the second one at the bottom (only the second one: it goes at the bottom)
+		if (!glyphs.length && glyphs2.length) { glyphs = glyphs2; glyphs2 = []; tp0 = 'bottom'; }
+		const two = glyphs.length > 0 && glyphs2.length > 0;
+		if (two) tp0 = 'top';
+		const has = sprites.length > 0, tpos = glyphs.length ? tp0 : 'none';
+		const vert = tpos === 'left' || tpos === 'right';
+		// text: bigger letters when there is no picture (or it goes over the picture); vertical text = letters one under the other
+		const tScale = !two && (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
+		const tw = vert ? 3 * tScale : glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
+		const th = vert ? (glyphs.length ? glyphs.length * 6 * tScale - tScale : 0) : 5 * tScale;
+		const scroll = vert ? th > H : tw > W;
+		const gap = H >= 20 || W >= 20 ? 1 : 0;
+		let tx = 0, ty = 0, area = { x: 0, y: 0, w: W, h: H };
+		if (tpos === 'bottom') { ty = H - th - gap; if (has) area.h = Math.max(4, ty - 1); }
+		else if (tpos === 'top') { ty = gap; if (has) { area.y = ty + th + 1; area.h = Math.max(4, H - area.y); } }
+		else if (tpos === 'left') { tx = gap; if (has) { area.x = tx + tw + 1; area.w = Math.max(4, W - area.x); } }
+		else if (tpos === 'right') { tx = W - tw - gap; if (has) area.w = Math.max(4, tx - 1); }
+		if (!has && !vert && tpos !== 'none') ty = tpos === 'top' ? gap : tpos === 'bottom' ? H - th - gap : Math.floor((H - th) / 2);
+		if (tpos === 'middle') ty = Math.floor((H - th) / 2);
+		if (vert && !has) tx = tpos === 'left' ? gap : W - tw - gap;
+		if (vert && !scroll) ty = Math.floor((H - th) / 2);
+		if (!vert && !scroll) tx = Math.floor((W - tw) / 2);
+		// the second line, at the bottom
+		const tw2 = glyphs2.length ? glyphs2.length * 4 - 1 : 0, scroll2 = tw2 > W, ty2 = H - 5 - gap, tx2 = Math.floor((W - tw2) / 2);
+		if (two && !has && H >= 18) ty = Math.max(gap, Math.floor(H / 2) - 6);   // no picture: the two lines closer to the middle
+		const ty2b = two && !has && H >= 18 ? Math.floor(H / 2) + 1 : ty2;
+		if (two && has) area.h = Math.max(4, ty2 - 1 - area.y);
+		// each picture in its own cell (side by side, or one under the other in a tall area), fitted with whole pixels when it grows
+		const n = sprites.length, across = area.w >= area.h;
+		// o.fit (v95, like "Picture size" on the board): 'fit' = in proportion, 'stretch' = stretched to its place, 'fill' = filling it (edges cut)
+		const fit = o.fit || 'fit';
+		// stretching or filling: the empty border around the picture is cut first, so the picture itself fills its place
+		const trim = sp => {
+			let x0 = sp.w, y0 = sp.h, x1 = -1, y1 = -1;
+			const all = sp.px.anim ? sp.px.anim.frames : [sp.px];
+			all.forEach(fr => fr.forEach((c, i) => { if (c) { const x = i % sp.w, y = Math.floor(i / sp.w); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } }));
+			if (x1 < 0) return sp;
+			const w = x1 - x0 + 1, hh = y1 - y0 + 1;
+			const cut = fr => { const px = []; for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) px.push(fr[(y0 + y) * sp.w + x0 + x]); return px; };
+			const px = cut(sp.px);
+			if (sp.px.anim) px.anim = Object.assign({}, sp.px.anim, { frames: sp.px.anim.frames.map(cut) });
+			return { w, h: hh, px };
+		};
+		// the frame of an animated picture at a given time (ms), from its own frame times
+		const frameAt = (px, ms) => {
+			const a = px.anim; if (!a) return px;
+			let t = ms % a.total;
+			for (let k = 0; k < a.frames.length; k++) { if (t < a.delays[k]) return a.frames[k]; t -= a.delays[k]; }
+			return a.frames[a.frames.length - 1];
+		};
+		const boxes = sprites.map((sp0, j) => {
+			const sp = (o.fit || 'fit') === 'fit' ? sp0 : trim(sp0);
+			const cw = across ? area.w / n : area.w, ch = across ? area.h : area.h / n;
+			const cx = area.x + (across ? j * cw : 0), cy = area.y + (across ? 0 : j * ch);
+			const clip = { x0: Math.round(cx), y0: Math.round(cy), x1: Math.round(cx + cw), y1: Math.round(cy + ch) };
+			let dw, dh;
+			if (fit === 'stretch') { dw = clip.x1 - clip.x0; dh = clip.y1 - clip.y0; }
+			else {
+				let sc = fit === 'fill' ? Math.max(cw / sp.w, ch / sp.h) : Math.min(cw / sp.w, ch / sp.h);
+				if (sc >= 1 && fit !== 'fill') sc = Math.floor(sc);
+				dw = Math.max(1, Math.round(sp.w * sc)); dh = Math.max(1, Math.round(sp.h * sc));
+			}
+			return { sp, dw, dh, clip: fit === 'fill' ? clip : null, x: Math.floor(cx + (cw - dw) / 2), y: Math.floor(cy + (ch - dh) / 2) };
+		});
+		const groupW = n ? Math.max(...boxes.map(b => b.x + b.dw)) - Math.min(...boxes.map(b => b.x)) : 0;
+		const groupX = n ? Math.min(...boxes.map(b => b.x)) : 0;
+		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: n ? W + groupW : vert ? H + th : W + Math.max(tw, tw2), grow: 20, shine: 24 }[fx] || 16;
+		const bgN = { snow: H * 2, stars: 24, confetti: H * 2, fireworks: 32, hearts: H + 6, fire: 16, bats: W + 6, sparkle: 16 }[bgfx] || 0;
+		if (bgN) N = N <= 1 ? bgN : Math.max(N, bgN);
+		// animated pictures: at least one full run of their own animation (at most 64 frames)
+		const animMs = Math.max(0, ...boxes.map(b => b.sp.px.anim ? b.sp.px.anim.total : 0));
+		const N0 = animMs ? Math.max(2, Math.round(animMs / delay)) : 0;
+		if (animMs) N = Math.min(64, Math.max(N, N0));
+		const msAt = i => N === N0 ? i * animMs / N0 : i * delay;   // when the GIF is exactly one run of the animation, it loops without a jump
+		if (scroll) N = Math.max(N, (vert ? th + H : tw + W) + 2);
+		if (scroll2) N = Math.max(N, tw2 + W + 2);
+		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
+		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * Math.max(1, W - 5)), R() * (H + 6)]);
+		const MULTI = [[255, 42, 42], [255, 210, 63], [57, 211, 83], [43, 183, 255], [155, 92, 255], [255, 79, 216], [255, 122, 26]];
+		const stars = Array.from({ length: Math.max(5, Math.round(W * H / 24)) }, () => [Math.floor(R() * W), Math.floor(R() * H), R()]);
+		const confetti = Array.from({ length: Math.max(6, Math.round(W * H / 22)) }, () => [R() * W, R() * H, R() < .5 ? 1 : 2, MULTI[Math.floor(R() * MULTI.length)]]);
+		const nB = Math.max(3, Math.round(W * H / 90)), bursts = Array.from({ length: nB }, (_, k) => [Math.floor(W * (0.2 + 0.6 * R())), Math.floor(H * (0.2 + 0.5 * R())), k / nB + R() * 0.1, MULTI[Math.floor(R() * MULTI.length)]]);
+		const bats = Array.from({ length: Math.max(2, Math.round(W / 8)) }, () => [R() * (W + 6), Math.floor(R() * Math.max(1, H - 4)), R() < .5 ? 1 : 2]);
+		const frames = [];
+		for (let i = 0; i < N; i++) {
+			const tt = i / N, f = new Array(W * H).fill(null).map(() => BG.slice());
+			const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) f[y * W + x] = c; };
+			// background effect first, then the pictures and the text on top (every one loops with the GIF)
+			if (bgfx === 'snow') for (const [x, y0, sp] of flakes) put(x, Math.floor((y0 + tt * H * sp) % H), [235, 240, 255]);
+			if (bgfx === 'hearts') for (const [x0, y0] of hearts) { const y = Math.floor(H - ((y0 + tt * (H + 6)) % (H + 6))); HEART.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1') put(x0 + rx, y + ry, [255, 79, 216]); })); }
+			if (bgfx === 'sparkle') { const Rf = rnd(100 + i); for (let s = 0; s < Math.round(W * H / 22); s++) { const x = Math.floor(Rf() * W), y = Math.floor(Rf() * H), v = Rf(); put(x, y, C1.map(c => c * (0.35 + 0.65 * v) | 0)); } }
+			if (bgfx === 'stars') for (const [x, y, ph] of stars) { const v = 0.5 + 0.5 * Math.sin(2 * Math.PI * (tt * 2 + ph)); if (v > 0.15) put(x, y, [255, 240, 190].map(c => c * v | 0)); }
+			if (bgfx === 'confetti') for (const [x0, y0, sp, c] of confetti) { const y = (y0 + tt * H * sp) % H; put(Math.floor((x0 + y * 0.5) % W), Math.floor(y), c); }
+			if (bgfx === 'fireworks') for (const [cx, cy, ph, c] of bursts) { const p = (tt + ph) % 1; if (p > 0.75) continue; const q = p / 0.75, r = 1 + q * Math.min(W, H) * 0.32, a = 1 - q * q;
+				for (let k = 0; k < 12; k++) { const an = k / 12 * 6.283; put(Math.round(cx + Math.cos(an) * r), Math.round(cy + Math.sin(an) * r), c.map(v => v * a | 0)); } put(cx, cy, p < 0.1 ? [255, 255, 255] : BG); }
+			if (bgfx === 'fire') for (let x = 0; x < W; x++) { const hgt = Math.round(H * (0.18 + 0.14 * Math.sin(2 * Math.PI * (tt * 2 + x * 0.37)) + 0.08 * Math.sin(2 * Math.PI * (tt * 3 + x * 0.91 + 0.3))));
+				for (let k = 0; k < hgt; k++) { const v = 1 - k / Math.max(1, hgt); put(x, H - 1 - k, [255, 60 + 170 * v | 0, 20 * v | 0]); } }
+			if (bgfx === 'bats') for (const [x0, y0, sp] of bats) { const x = Math.floor(((x0 + tt * (W + 6) * sp) % (W + 6)) - 5), y = Math.round(y0 + Math.sin(2 * Math.PI * (tt * 3 + x0)) * 1.2), flap = (i >> 1) % 2;
+				BAT.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1' && !(flap && ry === 0)) put(x + rx, y + ry, [155, 92, 255]); })); }
+			const off = fx === 'blink' && i >= N / 2;
+			const motion = (ph, seed) => {   // ph: 0..1 phase of this picture (pictures side by side take turns)
+				let dx = 0, dy = 0, sc = 1, mul = 1;
+				if (fx === 'bounce') dy = -Math.round(Math.abs(Math.sin(Math.PI * ph)) * Math.max(1, Math.round(H / 8)));
+				if (fx === 'shake') { const Rs = rnd(30 + i + seed * 97); dx = Math.round(Rs() * 2 - 1); dy = Math.round(Rs() * 2 - 1); }
+				if (fx === 'grow') sc = Math.min(1, 0.15 + 0.85 * Math.min(1, tt / 0.7));
+				if (fx === 'pulse') mul = 0.25 + 0.75 * (0.5 + 0.5 * Math.cos(2 * Math.PI * ph));
+				return { dx, dy, sc, mul };
+			};
+			if (!off) boxes.forEach((b, j) => {
+				// v97: pictures move together; o.turns = they take turns (bounce, pulse, shake)
+				const ph = (tt + (o.turns && n > 1 && (fx === 'bounce' || fx === 'pulse') ? j / n : 0)) % 1;
+				let { dx, dy, sc, mul } = motion(ph, o.turns ? j : 0);
+				if (fx === 'slide') dx = W - groupX - Math.round(tt * (W + groupW));
+				const band = (tt * (W + H + 8)) - 4, sp = b.sp, cur = frameAt(sp.px, msAt(i));
+				for (let y = 0; y < b.dh; y++) for (let x = 0; x < b.dw; x++) {
+					let sxp = x, syp = y;
+					if (sc < 1) { sxp = Math.floor((x - b.dw / 2) / sc + b.dw / 2); syp = Math.floor((y - b.dh / 2) / sc + b.dh / 2); if (sxp < 0 || syp < 0 || sxp >= b.dw || syp >= b.dh) continue; }
+					let c = cur[Math.floor(syp * sp.h / b.dh) * sp.w + Math.floor(sxp * sp.w / b.dw)];
+					if (!c) continue;
+					if (fx === 'rainbow') { const [hh, s, v] = rgb2hsv(c); c = hsv2rgb((hh + tt + j / 4) % 1, Math.max(s, 0.6), Math.max(v, 0.6)); }
+					if (fx === 'shine') { const d = Math.abs((b.x + x) + (b.y + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
+					if (mul !== 1) c = c.map(v => v * mul | 0);
+					const px = b.x + x + dx, py = b.y + y + dy;
+					if (b.clip && fx !== 'slide' && (px < b.clip.x0 || py < b.clip.y0 || px >= b.clip.x1 || py >= b.clip.y1)) continue;   // edges cut
+					put(px, py, c);
+				}
+			});
+			if (glyphs.length && !off) {
+				// with no picture (or text over it) the text itself does the animation: bounces, shakes, pulses, slides across,
+				// grows (the letters come in one by one) or shines
+				const subj = !has || tpos === 'middle';
+				const m = subj ? motion(tt, 9) : { dx: 0, dy: 0, mul: 1 };
+				const band = (tt * (W + H + 8)) - 4;
+				const tc = (gi, x, y, col) => {
+					let c = fx === 'rainbow' ? hsv2rgb((tt + gi / 8) % 1, 1, 1) : col || C1;
+					if (subj && fx === 'shine') { const d = Math.abs(x + y - band); if (d < 2.5) { const k = 0.8 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * k | 0); } }
+					return m.mul !== 1 ? c.map(v => v * m.mul | 0) : c;
+				};
+				const shown = len => subj && fx === 'grow' ? Math.max(1, Math.ceil(Math.min(1, tt / 0.7) * len)) : len;
+				// v16: each line goes to the side chosen ('left' = comes in on the right and goes out on the left, as usual)
+				const slideX = (len, d) => d === 'right' ? Math.round(tt * (W + len)) - len : W - Math.round(tt * (W + len));   // across, once per loop
+				const scrollX = (len, d) => d === 'right' ? Math.round(i * (len + W) / N) - len : W - Math.round(i * (len + W) / N);
+				const d1 = o.dir1 || 'left', d2 = o.dir2 || (fx === 'slide' ? 'right' : 'left');
+				const x0 = (scroll && !vert ? scrollX(tw, d1) : subj && fx === 'slide' && !vert ? slideX(tw, d1) : tx) + m.dx;
+				const y0 = (scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
+				const n1 = shown(glyphs.length);
+				glyphs.slice(0, n1).forEach((gl, gi) => {
+					const gx0 = vert ? x0 : x0 + gi * 4 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
+					for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
+						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) { const px = gx0 + gx * tScale + a, py = gy0 + gy * tScale + b2; put(px, py, tc(gi, px, py)); }
+				});
+				if (two) {
+					// the bottom line goes the other way when sliding across
+					const x2 = (scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = ty2b + m.dy;
+					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') { const px = x2 + gi * 4 + gx, py = y2 + gy; put(px, py, tc(gi + 3, px, py, o.c2)); } });
+				}
+			}
+			frames.push(f);
+		}
+		return frames;
+	}
+	function gifMakerCard(t, toast, base) {
+		let o = { pic: 'hw-pumpkin.gif', pic2: '', pic3: '', tpos: 'bottom', fx: 'bounce', txt: '', c1: '#ffd23f', bg: '#000000', spd: 90, size: 0, name: '' };
+		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yGifMaker') || '{}')); } catch (e) {}
+		if (['snow', 'sparkle', 'hearts'].includes(o.fx)) { o.bgfx = o.fx; o.fx = 'still'; }   // saved with the old single list
+		let draw = null;
+		try { draw = JSON.parse(localStorage.getItem('l4yGifDraw') || 'null'); } catch (e) {}
+		if (!Array.isArray(draw) || draw.length !== 256) draw = new Array(256).fill(null);
+		const save = () => { try { localStorage.setItem('l4yGifMaker', JSON.stringify(o)); localStorage.setItem('l4yGifDraw', JSON.stringify(draw)); } catch (e) {} };
+		let sprites = [], frames = [], W = 16, H = 16, delay = 90, bytes = null;
+		const spCache = {};
+		const inf = t.info();
+		const sizes = [[16, 16]];
+		if (inf.mw && inf.mh && inf.mw <= 64 && inf.mh <= 64 && !(inf.mw === 16 && inf.mh === 16)) sizes.push([inf.mw, inf.mh]);
+		if (!sizes.some(s => s[0] === 32 && s[1] === 32)) sizes.push([32, 32]);
+		const picSel = h('select', { 'aria-label': 'Picture' }, h('option', { value: '' }, 'No picture (only text and effect)'), h('option', { value: '*draw' }, 'My drawing'));
+		// v90: up to 3 pictures side by side (a candy cane and a tree…)
+		const pic2Sel = h('select', { 'aria-label': 'Second picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
+		const pic3Sel = h('select', { 'aria-label': 'Third picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
+		const tposSel = h('select', { 'aria-label': 'Where the text goes' }, [['bottom', 'Below'], ['top', 'Above'], ['left', 'On the left (letters one under the other)'], ['right', 'On the right (letters one under the other)'], ['middle', 'Over the picture']].map(([v, n]) => h('option', { value: v }, n)));
+		const fxSel = h('select', { 'aria-label': 'Animation' }, GM_FX.map(([v, n]) => h('option', { value: v }, n)));
+		const bgSel = h('select', { 'aria-label': 'Background effect' }, GM_BG.map(([v, n]) => h('option', { value: v }, n)));
+		const pfitSel = h('select', { 'aria-label': 'Pictures in the GIF' }, [['fit', 'In proportion'], ['stretch', 'Stretched to their place'], ['fill', 'Filling their place (edges cut)']].map(([v, n]) => h('option', { value: v }, n)));
+		// v99: several pictures move together (default) or take turns, as in the cube
+		const turnSel = h('select', { 'aria-label': 'The pictures move' }, [['0', 'At the same time'], ['1', 'Taking turns']].map(([v, n]) => h('option', { value: v }, n)));
+		const turnFld = h('label', { class: 'fld' }, h('span', {}, 'The pictures move'), turnSel);
+		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (i === 1 && sizes.length > 2 ? ' (your matrix)' : ''))));
+		const txt = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'Optional: a short text', value: o.txt || '' });
+		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Text and effect colour' });
+		const bg = h('input', { type: 'color', class: 'colbtn', value: o.bg, 'aria-label': 'Background colour' });
+		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
+		const nameIn = h('input', { class: 'search', type: 'text', maxlength: '22', placeholder: 'my-gif', value: o.name || '' });
+		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the GIF' });
+		const info = h('div', { class: 'note' });
+		const prog = h('div', { class: 'note' });
+		const sendBtn = h('button', { class: 'btn primary', type: 'button' }, 'Send to the lights');
+		const dlBtn = h('button', { class: 'btn', type: 'button' }, 'Save on this phone');
+		// drawing: 16×16, tap or drag to paint
+		const brush = h('input', { type: 'color', class: 'colbtn', value: '#ff3b30', 'aria-label': 'Brush colour' });
+		let erase = false;
+		const eraseBtn = h('button', { type: 'button', class: 'seg' }, 'Eraser');
+		const dcv = h('canvas', { class: 'gmdraw', width: '320', height: '320', 'aria-label': 'Drawing, 16 by 16' });
+		const drawGrid = () => { const g = dcv.getContext('2d'), c = 20; g.fillStyle = '#05060a'; g.fillRect(0, 0, 320, 320);
+			for (let i = 0; i < 256; i++) { const x = i % 16, y = i >> 4; g.fillStyle = draw[i] || '#1b1f2b'; g.fillRect(x * c + 1, y * c + 1, c - 2, c - 2); } };
+		let painting = false;
+		const paintAt = e => { const r = dcv.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * 16), y = Math.floor((e.clientY - r.top) / r.height * 16);
+			if (x < 0 || y < 0 || x > 15 || y > 15) return; const v = erase ? null : brush.value; if (draw[y * 16 + x] === v) return; draw[y * 16 + x] = v; drawGrid(); if ([picSel, pic2Sel, pic3Sel].some(x => x.value === '*draw')) setPic(); };
+		dcv.onpointerdown = e => { painting = true; dcv.setPointerCapture(e.pointerId); paintAt(e); };
+		dcv.onpointermove = e => { if (painting) paintAt(e); };
+		dcv.onpointerup = dcv.onpointercancel = () => { if (painting) { painting = false; save(); } };
+		eraseBtn.onclick = () => { erase = !erase; eraseBtn.classList.toggle('sel', erase); };
+		const clearBtn = h('button', { type: 'button', class: 'btn small' }, 'Clear');
+		clearBtn.onclick = () => { draw.fill(null); drawGrid(); save(); if ([picSel, pic2Sel, pic3Sel].some(x => x.value === '*draw')) setPic(); };
+		const copyBtn = h('button', { type: 'button', class: 'btn small' }, 'Start from a pack picture');
+		const drawBox = h('details', { class: 'more' }, h('summary', {}, 'My drawing'),
+			h('div', { class: 'note' }, 'Draw your own 16×16 picture. Choose "My drawing" as the picture to animate it.'),
+			h('div', { class: 'rowc' }, brush, h('div', { class: 'segs' }, eraseBtn), clearBtn, copyBtn),
+			h('div', { class: 'gmdrawwrap' }, dcv));
+		// one frame: array of W*H [r,g,b]
+		const build = () => {
+			[W, H] = sizes[+sizeSel.value] || sizes[0];
+			delay = +spd.value;
+			frames = gmFrames({ W, H, delay, sprites: sprites.map(px => ({ w: 16, h: 16, px })), fx: fxSel.value, bgfx: bgSel.value, fit: pfitSel.value, turns: turnSel.value === '1', text: txt.value, tpos: tposSel.value, c1: hexToRgb(c1.value), bg: hexToRgb(bg.value) });
+			const fx = fxSel.value;
+			turnFld.hidden = sprites.length < 2 || !['bounce', 'pulse', 'shake'].includes(fx);
+			bytes = gifEncode(frames, W, H, delay);
+			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
+			sendBtn.disabled = bytes.length > 65536;
+			o = { pic: picSel.value, pic2: pic2Sel.value, pic3: pic3Sel.value, tpos: tposSel.value, fx, bgfx: bgSel.value, pfit: pfitSel.value, turns: turnSel.value, txt: txt.value, c1: c1.value, bg: bg.value, spd: delay, size: +sizeSel.value, name: nameIn.value };
+			save();
+		};
+		const setPic = async () => {
+			const out = [];
+			for (const v of [picSel.value, pic2Sel.value, pic3Sel.value]) {
+				if (!v) continue;
+				if (v === '*draw') { out.push(draw.map(c => c ? hexToRgb(c) : null)); continue; }
+				if (!spCache[v]) { info.textContent = 'Loading the picture…'; try { spCache[v] = await gmLoadSprite(base + v); } catch (e) { info.textContent = 'The picture needs internet on this phone.'; continue; } }
+				out.push(spCache[v]);
+			}
+			sprites = out;
+			build();
+		};
+		copyBtn.onclick = async () => {
+			const v = picSel.value && picSel.value !== '*draw' ? picSel.value : 'hw-pumpkin.gif';
+			try { const px = await gmLoadSprite(base + v); draw = px.map(c => c ? rgbToHex(c[0], c[1], c[2]) : null); drawGrid(); save(); picSel.value = '*draw'; setPic(); }
+			catch (e) { toast('The picture needs internet on this phone.'); }
+		};
+		// preview: the frames drawn as LEDs, at the GIF's own speed
+		let pvI = 0, pvT = 0;
+		const pv = now => {
+			if (!cv.isConnected && pv.seen) return;
+			requestAnimationFrame(pv);
+			if (!cv.isConnected || !cv.clientWidth || !frames.length) return;
+			pv.seen = true;
+			if (now - pvT < delay) return; pvT = now; pvI = (pvI + 1) % frames.length;
+			const w = Math.min((cv.parentElement.clientWidth || 336) - 16, 360), cell = Math.max(3, Math.floor(w / W)), CW = cell * W, CH = cell * H;
+			if (cv.width !== CW * 2 || cv.height !== CH * 2) { cv.width = CW * 2; cv.height = CH * 2; cv.style.height = CH + 'px'; cv.style.width = CW + 'px'; }
+			const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.fillStyle = '#05060a'; g.fillRect(0, 0, CW, CH);
+			const f = frames[pvI] || frames[0];
+			for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const c = f[y * W + x]; g.fillStyle = c[0] + c[1] + c[2] > 9 ? 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')' : '#151823';
+				g.beginPath(); g.arc(x * cell + cell / 2, y * cell + cell / 2, cell * .4, 0, 6.283); g.fill(); }
+		};
+		requestAnimationFrame(pv);
+		const fileName = () => {
+			const s = (nameIn.value || ((picSel.selectedOptions[0] || {}).textContent || 'gif') + ' ' + fxSel.value).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+				.replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 22) || 'gif';
+			return 'my-' + s + '.gif';
+		};
+		sendBtn.onclick = async () => {
+			if (!bytes) return;
+			const name = fileName();
+			sendBtn.disabled = true;
+			try {
+				const ok = await t.upload(name, bytes, 0, p => { prog.textContent = 'Sending ' + name + '… ' + Math.round(p * 100) + '%'; });
+				if (!ok) throw new Error('upload');
+				gifWarn(t, toast);
+				await t.send({ on: true, seg: segOut(t, gifSeg(name)) });
+				prog.textContent = '';
+				toast('Playing ' + name + '. It stays saved on the lights.');
+				try { window.dispatchEvent(new Event('l4ygifs')); } catch (e) {}
+			} catch (e) { prog.textContent = 'Could not send the GIF. If the lights are full, delete a GIF you no longer use.'; }
+			sendBtn.disabled = false;
+		};
+		dlBtn.onclick = () => {
+			if (!bytes) return;
+			const a = h('a', { href: URL.createObjectURL(new Blob([bytes], { type: 'image/gif' })), download: fileName() });
+			document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+		};
+		[fxSel, bgSel, pfitSel, turnSel, sizeSel, c1, bg, tposSel].forEach(el => el.oninput = el.onchange = build);
+		pic2Sel.onchange = pic3Sel.onchange = setPic;
+		spd.addEventListener('input', build);
+		txt.oninput = build;
+		nameIn.oninput = () => { o.name = nameIn.value; save(); };
+		picSel.onchange = setPic;
+		fxSel.value = o.fx; if (!fxSel.value) fxSel.value = 'bounce';
+		bgSel.value = o.bgfx || '';
+		pfitSel.value = o.pfit || 'fit';
+		turnSel.value = o.turns === '1' ? '1' : '0';
+		sizeSel.value = String(Math.min(o.size || 0, sizes.length - 1));
+		tposSel.value = o.tpos || 'bottom';
+		drawGrid();
+		fetch(base + 'pack.json').then(r => r.json()).then(pack => {
+			for (const sel of [picSel, pic2Sel, pic3Sel]) [...new Set(pack.map(f => f.t))].forEach(th => sel.append(h('optgroup', { label: th }, pack.filter(f => f.t === th && !GM_TEXTGIF.has(f.f)).map(f => h('option', { value: f.f }, f.n)))));
+			picSel.value = o.pic; if (picSel.value !== o.pic) picSel.value = o.pic === '' ? '' : 'hw-pumpkin.gif';
+			pic2Sel.value = o.pic2 || ''; pic3Sel.value = o.pic3 || '';
+			setPic();
+		}).catch(() => { picSel.value = o.pic === '*draw' ? '*draw' : ''; setPic(); });
+		return h('section', { class: 'card' },
+			h('div', { class: 'ct' }, 'Make a GIF'),
+			h('div', { class: 'note' }, 'Pick a picture, an animation and, if you like, a short text. The GIF is made on this phone; then send it to the lights.'),
+			targetBar(t),
+			h('label', { class: 'fld' }, h('span', {}, 'Picture'), picSel),
+			h('label', { class: 'fld' }, h('span', {}, 'Second picture (optional)'), pic2Sel),
+			h('label', { class: 'fld' }, h('span', {}, 'Third picture (optional)'), pic3Sel),
+			h('label', { class: 'fld' }, h('span', {}, 'Pictures in the GIF'), pfitSel),
+			turnFld,
+			h('label', { class: 'fld' }, h('span', {}, 'Animation'), fxSel),
+			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgSel),
+			h('label', { class: 'fld' }, h('span', {}, 'Text'), txt),
+			h('label', { class: 'fld' }, h('span', {}, 'Where the text goes'), tposSel),
+			h('div', { class: 'rowc' }, h('label', { class: 'gmcol' }, c1, h('span', {}, 'Text / effect')), h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background'))),
+			h('div', { class: 'lab sp' }, 'Speed (time per frame)'), spd,
+			h('label', { class: 'fld' }, h('span', {}, 'Size'), sizeSel),
+			h('div', { class: 'gmpvwrap' }, cv), info,
+			drawBox,
+			h('label', { class: 'fld' }, h('span', {}, 'Name'), nameIn),
+			t.info().mw && t.info().mh ? fitRow(t, toast) : '',
+			h('div', { class: 'row' }, sendBtn, dlBtn), prog);
+	}
+
 	// ---------- House (Wi-Fi only): every LED4YOU / WLED on the network, names, scenes, xLights ----------
 	function houseCards(toast) {
 		const list = h('div', { class: 'hlist' });
@@ -1908,6 +2429,9 @@
 		myLedsCards,
 		extrasCards,
 		gifPackCard,
+		gifMakerCard,
+		textGifCard,
+		gm: { encode: gifEncode, frames: gmFrames, loadSprite: gmLoadSprite, FX: GM_FX, BG: GM_BG, TEXTGIF: GM_TEXTGIF },
 		zonesCard,
 		gifSeg, fitRow,
 		phoneSound: phoneMic,
@@ -2021,6 +2545,11 @@ details.more summary { cursor: pointer; font-weight: 600; color: var(--fg); }
 .gpitem { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); font-size: 12px; }
 .gpitem img { width: 64px; height: 64px; image-rendering: pixelated; border-radius: 6px; background: #000; }
 .gpitem[disabled] { opacity: .5; }
+.gmpvwrap { display: flex; justify-content: center; margin: 12px 0 4px; padding: 8px; background: #05060a; border-radius: 12px; }
+canvas.gmpv { width: auto; max-width: 100%; }
+.gmdrawwrap { display: flex; justify-content: center; margin-top: 8px; }
+canvas.gmdraw { width: 100%; max-width: 320px; aspect-ratio: 1; touch-action: none; border-radius: 10px; cursor: crosshair; }
+.gmcol { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .steps { margin: 0 0 10px; padding-left: 20px; font-size: 14px; color: var(--muted); display: grid; gap: 4px; }
 .scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 .scene { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--raise); }

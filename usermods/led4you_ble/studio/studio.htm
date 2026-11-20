@@ -135,7 +135,7 @@ function show(id) {
 }
 ['Text', 'Leds', 'Gifs', 'Lay', 'More', 'House'].forEach(k => { document.getElementById('tab' + k).onclick = () => show(k); });
 fetch('/json/si').then(r => r.json()).then(readInfo).catch(() => toast('Could not read the lights. Reload the page.')).finally(() => {
-	document.getElementById('paneText').append(L4YStudio.textCard(wifi, toast));
+	document.getElementById('paneText').append(L4YStudio.textCard(wifi, toast), L4YStudio.textGifCard(wifi, toast));
 	document.getElementById('paneLeds').append(...L4YStudio.myLedsCards(wifi, toast));
 	document.getElementById('paneMore').append(...L4YStudio.extrasCards(wifi, toast));
 	// Bluetooth: it switches itself off when Wi-Fi is up (frees ~50 KB of memory); switch it on again here when needed
@@ -152,7 +152,7 @@ fetch('/json/si').then(r => r.json()).then(readInfo).catch(() => toast('Could no
 		document.getElementById('paneMore').append(card);
 	}
 	// the pack lives with the app on GitHub Pages (sent with CORS), so it needs internet on the phone or computer
-	document.getElementById('paneGifs').append(...L4YStudio.myImagesCards(wifi, toast), L4YStudio.gifPackCard(wifi, toast, 'https://led4you.github.io/led4you/gifs/'));
+	document.getElementById('paneGifs').append(...L4YStudio.myImagesCards(wifi, toast), L4YStudio.gifPackCard(wifi, toast, 'https://led4you.github.io/led4you/gifs/'), L4YStudio.gifMakerCard(wifi, toast, 'https://led4you.github.io/led4you/gifs/'));
 	if (location.hash === '#gifs') show('Gifs');
 	L4YStudio.autoHelp();
 	let houseMounted = false;
