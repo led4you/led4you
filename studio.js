@@ -219,7 +219,7 @@
 		const bg = h('input', { type: 'color', class: 'colbtn', value: o.bg, 'aria-label': 'Background colour' });
 		const sel = (list, v, label) => { const s = h('select', { 'aria-label': label }, list.map(([k, n]) => h('option', { value: k }, n))); s.value = v; return s; };
 		const pos = sel([['top', 'On top'], ['middle', 'In the middle'], ['bottom', 'At the bottom'], ['two', 'Two lines']], o.pos, 'Where the text goes');
-		const DIRS2 = [['left', 'To the left'], ['right', 'To the right']];
+		const DIRS2 = [['stay', 'Stays still'], ['left', 'To the left'], ['right', 'To the right']];
 		const d1 = sel(DIRS2, o.d1, 'Where the top line goes'), d2 = sel(DIRS2, o.d2, 'Where the bottom line goes');
 		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
 		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
@@ -1950,7 +1950,8 @@
 				const slideX = (len, d) => d === 'right' ? Math.round(tt * (W + len)) - len : W - Math.round(tt * (W + len));   // across, once per loop
 				const scrollX = (len, d) => d === 'right' ? Math.round(i * (len + W) / N) - len : W - Math.round(i * (len + W) / N);
 				const d1 = o.dir1 || 'left', d2 = o.dir2 || (fx === 'slide' ? 'right' : 'left');
-				const x0 = (scroll && !vert ? scrollX(tw, d1) : subj && fx === 'slide' && !vert ? slideX(tw, d1) : tx) + m.dx;
+				// v100: 'stay' = this line stands still (centred; a text longer than the matrix is cut)
+				const x0 = (d1 === 'stay' && !vert ? tx : scroll && !vert ? scrollX(tw, d1) : subj && fx === 'slide' && !vert ? slideX(tw, d1) : tx) + m.dx;
 				const y0 = (scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
 				const n1 = shown(glyphs.length);
 				glyphs.slice(0, n1).forEach((gl, gi) => {
@@ -1960,7 +1961,7 @@
 				});
 				if (two) {
 					// the bottom line goes the other way when sliding across
-					const x2 = (scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = ty2b + m.dy;
+					const x2 = (d2 === 'stay' ? tx2 : scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = ty2b + m.dy;
 					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') { const px = x2 + gi * 4 + gx, py = y2 + gy; put(px, py, tc(gi + 3, px, py, o.c2)); } });
 				}
 			}

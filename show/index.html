@@ -135,7 +135,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=24"></script>
+<script src="../studio.js?v=25"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -425,7 +425,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	if (GM) {
 		const box = $('txtStyle'), mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
 		const styles = mk('div', 'chips'), fxs = mk('div', 'chips'), bgfxs = mk('div', 'chips'), spd = mk('div', 'chips'), bg = mk('div', 'swatches'), c2 = mk('div', 'swatches');
-		const d1 = mk('div', 'chips'), d2 = mk('div', 'chips'), d1lab = mk('div', 'lab', 'A linha de cima vai para'), d2lab = mk('div', 'lab', 'A linha de baixo vai para'), c2lab = mk('div', 'lab', 'Cor da linha de baixo');
+		const d1 = mk('div', 'chips'), d2 = mk('div', 'chips'), d1lab = mk('div', 'lab', 'A linha de cima'), d2lab = mk('div', 'lab', 'A linha de baixo'), c2lab = mk('div', 'lab', 'Cor da linha de baixo');
 		const t2 = mk('input'); t2.type = 'text'; t2.maxLength = 40; t2.autocomplete = 'off'; t2.placeholder = 'Texto da linha de baixo';
 		const t2lab = mk('label', 'lab', 'Linha de baixo'), cv = mk('canvas'), pvw = mk('div', 'apv'), info = mk('p', 'note ainfo'); pvw.append(cv);
 		const extra = [mk('div', 'lab', 'Movimento do texto'), fxs, mk('div', 'lab', 'Efeito de fundo'), bgfxs, d1lab, d1, d2lab, d2, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw];
@@ -435,14 +435,14 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			row(fxs, [['still', 'Parado']].concat(ANIMS.slice(1)), txtS.fx, v => { txtS.fx = v; draw(); txtS.build(); });
 			row(bgfxs, BGS, txtS.bgfx, v => { txtS.bgfx = v; draw(); txtS.build(); });
 			row(spd, SPEEDS.map(([n, ms]) => [ms, n]), txtS.spd, v => { txtS.spd = v; draw(); txtS.build(); });
-			const DIRS = [['left', '⬅️ Para a esquerda'], ['right', '➡️ Para a direita']];
+			const DIRS = [['stay', '⏸️ Fica parado'], ['left', '⬅️ Vai para a esquerda'], ['right', '➡️ Vai para a direita']];
 			row(d1, DIRS, txtS.d1, v => { txtS.d1 = v; draw(); txtS.build(); });
 			row(d2, DIRS, txtS.d2, v => { txtS.d2 = v; draw(); txtS.build(); });
 			const on = txtS.style !== 'scroll', two = txtS.style === 'two';
 			extra.concat([info]).forEach(e => e.hidden = !on);
 			t2lab.hidden = t2.hidden = c2lab.hidden = c2.hidden = !two;
 			d2lab.hidden = d2.hidden = !two;
-			d1lab.textContent = two ? 'A linha de cima vai para' : 'O texto vai para';
+			d1lab.textContent = two ? 'A linha de cima' : 'O texto';
 			$('txtColLab').textContent = two ? 'Cor da linha de cima' : 'Cor';
 		};
 		box.append(mk('div', 'lab', 'Como aparece'), styles, t2lab, t2, c2lab, c2, ...extra, info);

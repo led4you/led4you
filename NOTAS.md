@@ -92,3 +92,4 @@ A página dos visitantes (`show/index.html`) só precisa de push.
 - App v98: novo cartão "Texto com animação" no separador Texto (Bluetooth): em cima / ao meio / em baixo / duas linhas, cor e direção por linha, movimento, efeito de fundo, cor de fundo, velocidade. Gera GIF no telemóvel e envia como l4y-texto-a/b.gif (alterna).
 - App v99: Criar um GIF ganhou "As imagens mexem: ao mesmo tempo / à vez" (como no cubo), com 2+ imagens e Saltar/Pulsar/Tremer.
 - Firmware v104 (só código, ainda não compilado — esta sessão não chega aos servidores do PlatformIO): Studio por Wi-Fi com "Texto com animação" e "Criar um GIF"; studio.js minificado no build_studio.js (precisa de npm ci), página fica 101 166 bytes gz (antes 101 788), por isso cabe na C3.
+- App v100 / cubo: cada linha de texto pode "Ficar parada" (além de esquerda/direita).

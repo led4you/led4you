@@ -38,6 +38,7 @@
 		['The pictures move', 'As imagens mexem', 'Las imágenes se mueven', 'Les images bougent'],
 		['At the same time', 'Ao mesmo tempo', 'A la vez', 'En même temps'],
 		['Taking turns', 'À vez', 'Por turnos', 'À tour de rôle'],
+		['Stays still', 'Fica parado', 'Se queda quieto', 'Reste immobile'],
 		['Background effect', 'Efeito de fundo', 'Efecto de fondo', 'Effet de fond'],
 		['Nothing', 'Nenhum', 'Ninguno', 'Aucun'],
 		['Twinkling stars', 'Estrelas a piscar', 'Estrellas que brillan', 'Étoiles scintillantes'],
