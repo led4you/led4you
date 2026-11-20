@@ -211,7 +211,12 @@
 		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'stay', d2: 'stay', fx: 'still', bgfx: 'snow', bg: '#000000', spd: 90, ts: 'auto' };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yTextGif') || '{}')); } catch (e) {}
 		const save = () => { try { localStorage.setItem('l4yTextGif', JSON.stringify(o)); } catch (e) {} };
-		const W = inf.mw && inf.mh ? Math.min(64, inf.mw) : 16, H = inf.mw && inf.mh ? Math.min(64, inf.mh) : 16;
+		// v105: made at the size of the matrix, whatever it is. If the GIF goes over the 64 KB the lights accept, it is made
+		// smaller (half, then a quarter…, same shape) and the lights enlarge it. Very big matrices start smaller straight
+		// away (a GIF of more than 128×128 points could never stay under 64 KB with movement, and would be slow to make)
+		const MW = inf.mw && inf.mh ? inf.mw : 16, MH = inf.mw && inf.mh ? inf.mh : 16, k0 = Math.min(1, Math.sqrt(16384 / (MW * MH)));
+		const W0 = Math.max(8, Math.round(MW * k0)), H0 = Math.max(8, Math.round(MH * k0));
+		let W = W0, H = H0;
 		const t1 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'FELIZ', value: o.t1 });
 		const t2 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'NATAL', value: o.t2 });
 		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Colour of the top line' });
@@ -224,7 +229,7 @@
 		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
 		const ts = sel([['auto', 'Automatic (as big as fits)'], ['1', 'Small'], ['2', 'Medium'], ['3', 'Big'], ['4', 'Very big']], o.ts, 'Text size');
 		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
-		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), prog = h('div', { class: 'note' });
+		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), warn = h('div', { class: 'note warnline' }), smallNote = h('div', { class: 'note' }), prog = h('div', { class: 'note' });
 		const sendBtn = h('button', { class: 'btn primary', type: 'button' }, 'Show on the lights');
 		const line2 = [h('label', { class: 'fld' }, h('span', {}, 'Bottom line'), t2), h('label', { class: 'fld' }, h('span', {}, 'The bottom line goes'), d2),
 			h('label', { class: 'gmcol' }, c2, h('span', {}, 'Colour of the bottom line'))];
@@ -243,11 +248,18 @@
 			c1lab.textContent = two ? 'Colour of the top line' : 'Text colour';
 			bytes = null; frames = [];
 			if (!o.t1.trim() && !(two && o.t2.trim())) { info.textContent = 'Type a message first.'; sendBtn.disabled = true; return; }
-			frames = gmFrames({ W, H, delay: o.spd, sprites: [], fx: o.fx, bgfx: o.bgfx, text: o.t1, text2: two ? o.t2 : '', tpos: two ? 'top' : o.pos,
-				c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, tsize: o.ts, bg: hexToRgb(o.bg) });
-			bytes = gifEncode(frames, W, H, o.spd);
+			for (let k = 1; ; k *= 2) {
+				W = Math.max(8, Math.round(W0 / k)); H = Math.max(8, Math.round(H0 / k));
+				frames = gmFrames({ W, H, delay: o.spd, sprites: [], fx: o.fx, bgfx: o.bgfx, text: o.t1, text2: two ? o.t2 : '', tpos: two ? 'top' : o.pos,
+					c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, tsize: o.ts, bg: hexToRgb(o.bg) });
+				bytes = gifEncode(frames, W, H, o.spd);
+				if (bytes.length <= 65536 || (W <= 16 && H <= 16)) break;
+			}
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
+			smallNote.textContent = W < W0 ? 'Made smaller to stay under 64 KB: the lights enlarge it to your matrix.' : '';
+			const cut = (txt, d) => d === 'stay' && txt.trim().length * 3 > (o.pos === 'left' || o.pos === 'right' ? 99 : W);
+			warn.textContent = cut(o.t1, o.d1) || (two && cut(o.t2, o.d2)) ? 'The text does not fit standing still: it is cut at the sides. Use a shorter word or make it move.' : '';
 		};
 		let pi = 0, pt = 0;
 		const pv = now => {
@@ -279,7 +291,9 @@
 			} catch (e) { prog.textContent = 'Could not send the text. If the lights are full, delete a GIF you no longer use.'; }
 			sendBtn.disabled = false;
 		};
-		[t1, t2].forEach(e => e.addEventListener('input', build));
+		// typing: wait a moment before making the GIF again (big matrices take longer)
+		let typing = 0;
+		[t1, t2].forEach(e => e.addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(build, W0 * H0 > 1024 ? 350 : 60); if (t1.value.trim() || t2.value.trim()) sendBtn.disabled = false; }));
 		[pos, d1, d2, fx, bgfx, ts, c1, c2, bg].forEach(e => { e.addEventListener('input', build); e.addEventListener('change', build); });
 		spd.addEventListener('input', build);
 		build();
@@ -298,7 +312,7 @@
 			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgfx),
 			h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background')),
 			h('div', { class: 'lab sp' }, 'Speed (time per frame)'), spd,
-			h('div', { class: 'gmpvwrap' }, cv), info,
+			h('div', { class: 'gmpvwrap' }, cv), info, smallNote, warn,
 			h('div', { class: 'row' }, sendBtn), prog);
 	}
 
@@ -1837,7 +1851,9 @@
 		const tScale = o.tsize === 'auto' && len1 ? (has && tpos !== 'middle' ? 1 : autoS(len1, o.dir1, hEach)) : o.tsize ? fixS(o.tsize)
 			: !two && (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
 		const s2 = !two ? 1 : o.tsize === 'auto' ? (has ? 1 : autoS(len2, o.dir2, hEach)) : o.tsize ? fixS(o.tsize) : 1;
-		const tw = vert ? 3 * tScale : glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
+		// v103: a line that stays still and is a bit too long gets its letters closer together (no space between them)
+		const step1 = !vert && o.dir1 === 'stay' && len1 * 4 * tScale - tScale > W ? 3 : 4;
+		const tw = vert ? 3 * tScale : len1 ? len1 * step1 * tScale - (step1 === 4 ? tScale : 0) : 0;
 		const th = vert ? (glyphs.length ? glyphs.length * 6 * tScale - tScale : 0) : 5 * tScale;
 		const scroll = vert ? th > H : tw > W;
 		const gap = H >= 20 || W >= 20 ? 1 : 0;
@@ -1852,10 +1868,9 @@
 		if (vert && !scroll) ty = Math.floor((H - th) / 2);
 		if (!vert && !scroll) tx = Math.floor((W - tw) / 2);
 		// the second line, at the bottom
-		const tw2 = glyphs2.length ? glyphs2.length * 4 * s2 - s2 : 0, th2 = 5 * s2, scroll2 = tw2 > W, ty2 = H - th2 - gap, tx2 = Math.floor((W - tw2) / 2);
-		// a line longer than the matrix cannot stand still: it goes to the left instead (so it can be read)
-		if (o.dir1 === 'stay' && scroll) o.dir1 = vert ? 'up' : 'left';
-		if (o.dir2 === 'stay' && scroll2) o.dir2 = 'left';
+		const step2 = o.dir2 === 'stay' && len2 * 4 * s2 - s2 > W ? 3 : 4;
+		const tw2 = len2 ? len2 * step2 * s2 - (step2 === 4 ? s2 : 0) : 0, th2 = 5 * s2, scroll2 = tw2 > W, ty2 = H - th2 - gap, tx2 = Math.floor((W - tw2) / 2);
+		// 'stay' is always still (v103): a line that does not fit even with the letters together is cut at the sides
 		// no picture: the two lines together in the middle when there is room (else one at the top, one at the bottom)
 		const pair = two && !has && H >= th + th2 + 4;
 		if (pair) ty = Math.floor((H - th - th2 - 2) / 2);
@@ -1982,6 +1997,8 @@
 					if (subj && fx === 'shine') { const d = Math.abs(x + y - band); if (d < 2.5) { const k = 0.8 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * k | 0); } }
 					return m.mul !== 1 ? c.map(v => v * m.mul | 0) : c;
 				};
+				// letters close together: every other letter a little darker, so they can still be told apart
+				const dimOdd = (step, gi, c) => step === 3 && gi % 2 ? c.map(v => v * 0.5 | 0) : c;
 				const shown = len => subj && fx === 'grow' ? Math.max(1, Math.ceil(Math.min(1, tt / 0.7) * len)) : len;
 				// v16: each line goes to the side chosen ('left' = comes in on the right and goes out on the left, as usual)
 				const slideX = (len, d) => d === 'right' ? Math.round(tt * (W + len)) - len : W - Math.round(tt * (W + len));   // across, once per loop
@@ -1994,16 +2011,16 @@
 				const y0 = (ud1 ? upDown(o.dir1, th, ty) : d1 === 'stay' && vert ? Math.floor((H - th) / 2) : scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
 				const n1 = shown(glyphs.length);
 				glyphs.slice(0, n1).forEach((gl, gi) => {
-					const gx0 = vert ? x0 : x0 + gi * 4 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
+					const gx0 = vert ? x0 : x0 + gi * step1 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
 					for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
-						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) { const px = gx0 + gx * tScale + a, py = gy0 + gy * tScale + b2; put(px, py, tc(gi, px, py)); }
+						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) { const px = gx0 + gx * tScale + a, py = gy0 + gy * tScale + b2; put(px, py, dimOdd(step1, gi, tc(gi, px, py))); }
 				});
 				if (two) {
 					// the bottom line goes the other way when sliding across
 					const ud2 = o.dir2 === 'up' || o.dir2 === 'down';
 					const x2 = (d2 === 'stay' || ud2 ? tx2 : o.dir2 === 'left' || o.dir2 === 'right' ? slideX(tw2, d2) : scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = (ud2 ? upDown(o.dir2, th2, ty2b) : ty2b) + m.dy;
 					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
-						for (let a = 0; a < s2; a++) for (let b2 = 0; b2 < s2; b2++) { const px = x2 + gi * 4 * s2 + gx * s2 + a, py = y2 + gy * s2 + b2; put(px, py, tc(gi + 3, px, py, o.c2)); } });
+						for (let a = 0; a < s2; a++) for (let b2 = 0; b2 < s2; b2++) { const px = x2 + gi * step2 * s2 + gx * s2 + a, py = y2 + gy * s2 + b2; put(px, py, dimOdd(step2, gi, tc(gi + 3, px, py, o.c2))); } });
 				}
 			}
 			frames.push(f);
@@ -2021,9 +2038,12 @@
 		let sprites = [], frames = [], W = 16, H = 16, delay = 90, bytes = null;
 		const spCache = {};
 		const inf = t.info();
-		const sizes = [[16, 16]];
-		if (inf.mw && inf.mh && inf.mw <= 64 && inf.mh <= 64 && !(inf.mw === 16 && inf.mh === 16)) sizes.push([inf.mw, inf.mh]);
-		if (!sizes.some(s => s[0] === 32 && s[1] === 32)) sizes.push([32, 32]);
+		// v105: 16×16, the size of your matrix (whatever it is), half of it (same shape) and 32×32. A GIF smaller than
+		// the matrix is enlarged by the lights; the file must stay under 64 KB, so big sizes suit short animations
+		const sizes = [[16, 16]], mine = inf.mw && inf.mh ? [inf.mw, inf.mh] : null;
+		const add = z => { if (!sizes.some(s => s[0] === z[0] && s[1] === z[1])) sizes.push(z); };
+		if (mine) { add(mine); if (mine[0] > 32 || mine[1] > 32) add([Math.max(8, Math.round(mine[0] / 2)), Math.max(8, Math.round(mine[1] / 2))]); }
+		add([32, 32]);
 		const picSel = h('select', { 'aria-label': 'Picture' }, h('option', { value: '' }, 'No picture (only text and effect)'), h('option', { value: '*draw' }, 'My drawing'));
 		// v90: up to 3 pictures side by side (a candy cane and a tree…)
 		const pic2Sel = h('select', { 'aria-label': 'Second picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
@@ -2035,7 +2055,7 @@
 		// v99: several pictures move together (default) or take turns, as in the cube
 		const turnSel = h('select', { 'aria-label': 'The pictures move' }, [['0', 'At the same time'], ['1', 'Taking turns']].map(([v, n]) => h('option', { value: v }, n)));
 		const turnFld = h('label', { class: 'fld' }, h('span', {}, 'The pictures move'), turnSel);
-		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (i === 1 && sizes.length > 2 ? ' (your matrix)' : ''))));
+		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (mine && w === mine[0] && hh === mine[1] ? ' (your matrix)' : ''))));
 		const txt = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'Optional: a short text', value: o.txt || '' });
 		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Text and effect colour' });
 		const bg = h('input', { type: 'color', class: 'colbtn', value: o.bg, 'aria-label': 'Background colour' });
