@@ -224,7 +224,7 @@
 		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
 		const ts = sel([['auto', 'Automatic (as big as fits)'], ['1', 'Small'], ['2', 'Medium'], ['3', 'Big'], ['4', 'Very big']], o.ts, 'Text size');
 		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
-		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), prog = h('div', { class: 'note' });
+		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), warn = h('div', { class: 'note warnline' }), prog = h('div', { class: 'note' });
 		const sendBtn = h('button', { class: 'btn primary', type: 'button' }, 'Show on the lights');
 		const line2 = [h('label', { class: 'fld' }, h('span', {}, 'Bottom line'), t2), h('label', { class: 'fld' }, h('span', {}, 'The bottom line goes'), d2),
 			h('label', { class: 'gmcol' }, c2, h('span', {}, 'Colour of the bottom line'))];
@@ -248,6 +248,8 @@
 			bytes = gifEncode(frames, W, H, o.spd);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
+			const cut = (txt, d) => d === 'stay' && txt.trim().length * 3 > (o.pos === 'left' || o.pos === 'right' ? 99 : W);
+			warn.textContent = cut(o.t1, o.d1) || (two && cut(o.t2, o.d2)) ? 'The text does not fit standing still: it is cut at the sides. Use a shorter word or make it move.' : '';
 		};
 		let pi = 0, pt = 0;
 		const pv = now => {
@@ -298,7 +300,7 @@
 			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgfx),
 			h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background')),
 			h('div', { class: 'lab sp' }, 'Speed (time per frame)'), spd,
-			h('div', { class: 'gmpvwrap' }, cv), info,
+			h('div', { class: 'gmpvwrap' }, cv), info, warn,
 			h('div', { class: 'row' }, sendBtn), prog);
 	}
 
@@ -1837,7 +1839,9 @@
 		const tScale = o.tsize === 'auto' && len1 ? (has && tpos !== 'middle' ? 1 : autoS(len1, o.dir1, hEach)) : o.tsize ? fixS(o.tsize)
 			: !two && (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
 		const s2 = !two ? 1 : o.tsize === 'auto' ? (has ? 1 : autoS(len2, o.dir2, hEach)) : o.tsize ? fixS(o.tsize) : 1;
-		const tw = vert ? 3 * tScale : glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
+		// v103: a line that stays still and is a bit too long gets its letters closer together (no space between them)
+		const step1 = !vert && o.dir1 === 'stay' && len1 * 4 * tScale - tScale > W ? 3 : 4;
+		const tw = vert ? 3 * tScale : len1 ? len1 * step1 * tScale - (step1 === 4 ? tScale : 0) : 0;
 		const th = vert ? (glyphs.length ? glyphs.length * 6 * tScale - tScale : 0) : 5 * tScale;
 		const scroll = vert ? th > H : tw > W;
 		const gap = H >= 20 || W >= 20 ? 1 : 0;
@@ -1852,10 +1856,9 @@
 		if (vert && !scroll) ty = Math.floor((H - th) / 2);
 		if (!vert && !scroll) tx = Math.floor((W - tw) / 2);
 		// the second line, at the bottom
-		const tw2 = glyphs2.length ? glyphs2.length * 4 * s2 - s2 : 0, th2 = 5 * s2, scroll2 = tw2 > W, ty2 = H - th2 - gap, tx2 = Math.floor((W - tw2) / 2);
-		// a line longer than the matrix cannot stand still: it goes to the left instead (so it can be read)
-		if (o.dir1 === 'stay' && scroll) o.dir1 = vert ? 'up' : 'left';
-		if (o.dir2 === 'stay' && scroll2) o.dir2 = 'left';
+		const step2 = o.dir2 === 'stay' && len2 * 4 * s2 - s2 > W ? 3 : 4;
+		const tw2 = len2 ? len2 * step2 * s2 - (step2 === 4 ? s2 : 0) : 0, th2 = 5 * s2, scroll2 = tw2 > W, ty2 = H - th2 - gap, tx2 = Math.floor((W - tw2) / 2);
+		// 'stay' is always still (v103): a line that does not fit even with the letters together is cut at the sides
 		// no picture: the two lines together in the middle when there is room (else one at the top, one at the bottom)
 		const pair = two && !has && H >= th + th2 + 4;
 		if (pair) ty = Math.floor((H - th - th2 - 2) / 2);
@@ -1982,6 +1985,8 @@
 					if (subj && fx === 'shine') { const d = Math.abs(x + y - band); if (d < 2.5) { const k = 0.8 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * k | 0); } }
 					return m.mul !== 1 ? c.map(v => v * m.mul | 0) : c;
 				};
+				// letters close together: every other letter a little darker, so they can still be told apart
+				const dimOdd = (step, gi, c) => step === 3 && gi % 2 ? c.map(v => v * 0.5 | 0) : c;
 				const shown = len => subj && fx === 'grow' ? Math.max(1, Math.ceil(Math.min(1, tt / 0.7) * len)) : len;
 				// v16: each line goes to the side chosen ('left' = comes in on the right and goes out on the left, as usual)
 				const slideX = (len, d) => d === 'right' ? Math.round(tt * (W + len)) - len : W - Math.round(tt * (W + len));   // across, once per loop
@@ -1994,16 +1999,16 @@
 				const y0 = (ud1 ? upDown(o.dir1, th, ty) : d1 === 'stay' && vert ? Math.floor((H - th) / 2) : scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
 				const n1 = shown(glyphs.length);
 				glyphs.slice(0, n1).forEach((gl, gi) => {
-					const gx0 = vert ? x0 : x0 + gi * 4 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
+					const gx0 = vert ? x0 : x0 + gi * step1 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
 					for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
-						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) { const px = gx0 + gx * tScale + a, py = gy0 + gy * tScale + b2; put(px, py, tc(gi, px, py)); }
+						for (let a = 0; a < tScale; a++) for (let b2 = 0; b2 < tScale; b2++) { const px = gx0 + gx * tScale + a, py = gy0 + gy * tScale + b2; put(px, py, dimOdd(step1, gi, tc(gi, px, py))); }
 				});
 				if (two) {
 					// the bottom line goes the other way when sliding across
 					const ud2 = o.dir2 === 'up' || o.dir2 === 'down';
 					const x2 = (d2 === 'stay' || ud2 ? tx2 : o.dir2 === 'left' || o.dir2 === 'right' ? slideX(tw2, d2) : scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = (ud2 ? upDown(o.dir2, th2, ty2b) : ty2b) + m.dy;
 					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
-						for (let a = 0; a < s2; a++) for (let b2 = 0; b2 < s2; b2++) { const px = x2 + gi * 4 * s2 + gx * s2 + a, py = y2 + gy * s2 + b2; put(px, py, tc(gi + 3, px, py, o.c2)); } });
+						for (let a = 0; a < s2; a++) for (let b2 = 0; b2 < s2; b2++) { const px = x2 + gi * step2 * s2 + gx * s2 + a, py = y2 + gy * s2 + b2; put(px, py, dimOdd(step2, gi, tc(gi + 3, px, py, o.c2))); } });
 				}
 			}
 			frames.push(f);

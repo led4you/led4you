@@ -50,6 +50,7 @@
 		['Medium', 'Médio', 'Mediano', 'Moyen'],
 		['Big', 'Grande', 'Grande', 'Grand'],
 		['Very big', 'Muito grande', 'Muy grande', 'Très grand'],
+		['The text does not fit standing still: it is cut at the sides. Use a shorter word or make it move.', 'O texto não cabe parado: fica cortado dos lados. Usa uma palavra mais curta ou põe-no a mexer.', 'El texto no cabe quieto: se corta por los lados. Usa una palabra más corta o ponlo en movimiento.', 'Le texte ne tient pas immobile : il est coupé sur les côtés. Utilisez un mot plus court ou faites-le bouger.'],
 		['Background effect', 'Efeito de fundo', 'Efecto de fondo', 'Effet de fond'],
 		['Nothing', 'Nenhum', 'Ninguno', 'Aucun'],
 		['Twinkling stars', 'Estrelas a piscar', 'Estrellas que brillan', 'Étoiles scintillantes'],
