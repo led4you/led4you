@@ -208,7 +208,7 @@
 	// each line with its colour and side, a movement and a background effect (the same as in the cube) ----------
 	function textGifCard(t, toast) {
 		const inf = t.info();
-		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'stay', d2: 'stay', fx: 'still', bgfx: 'snow', bg: '#000000', spd: 90 };
+		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'stay', d2: 'stay', fx: 'still', bgfx: 'snow', bg: '#000000', spd: 90, ts: 'auto' };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yTextGif') || '{}')); } catch (e) {}
 		const save = () => { try { localStorage.setItem('l4yTextGif', JSON.stringify(o)); } catch (e) {} };
 		const W = inf.mw && inf.mh ? Math.min(64, inf.mw) : 16, H = inf.mw && inf.mh ? Math.min(64, inf.mh) : 16;
@@ -222,6 +222,7 @@
 		const DIRS2 = [['stay', 'Stays still'], ['left', 'To the left'], ['right', 'To the right'], ['up', 'Upwards'], ['down', 'Downwards']];
 		const d1 = sel(DIRS2, o.d1, 'Where the top line goes'), d2 = sel(DIRS2, o.d2, 'Where the bottom line goes');
 		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
+		const ts = sel([['auto', 'Automatic (as big as fits)'], ['1', 'Small'], ['2', 'Medium'], ['3', 'Big'], ['4', 'Very big']], o.ts, 'Text size');
 		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
 		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), prog = h('div', { class: 'note' });
 		const sendBtn = h('button', { class: 'btn primary', type: 'button' }, 'Show on the lights');
@@ -230,7 +231,7 @@
 		const d1lab = h('span', {}, 'The text goes'), c1lab = h('span', {}, 'Text colour');
 		let frames = [], bytes = null, turn = 0;
 		const build = () => {
-			o = { t1: t1.value, t2: t2.value, pos: pos.value, c1: c1.value, c2: c2.value, d1: d1.value, d2: d2.value, fx: fx.value, bgfx: bgfx.value, bg: bg.value, spd: +spd.value };
+			o = { t1: t1.value, t2: t2.value, pos: pos.value, c1: c1.value, c2: c2.value, d1: d1.value, d2: d2.value, fx: fx.value, bgfx: bgfx.value, bg: bg.value, spd: +spd.value, ts: ts.value };
 			save();
 			const two = o.pos === 'two';
 			line2.forEach(e => e.hidden = !two);
@@ -243,7 +244,7 @@
 			bytes = null; frames = [];
 			if (!o.t1.trim() && !(two && o.t2.trim())) { info.textContent = 'Type a message first.'; sendBtn.disabled = true; return; }
 			frames = gmFrames({ W, H, delay: o.spd, sprites: [], fx: o.fx, bgfx: o.bgfx, text: o.t1, text2: two ? o.t2 : '', tpos: two ? 'top' : o.pos,
-				c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, bg: hexToRgb(o.bg) });
+				c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, tsize: o.ts, bg: hexToRgb(o.bg) });
 			bytes = gifEncode(frames, W, H, o.spd);
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
@@ -279,7 +280,7 @@
 			sendBtn.disabled = false;
 		};
 		[t1, t2].forEach(e => e.addEventListener('input', build));
-		[pos, d1, d2, fx, bgfx, c1, c2, bg].forEach(e => { e.addEventListener('input', build); e.addEventListener('change', build); });
+		[pos, d1, d2, fx, bgfx, ts, c1, c2, bg].forEach(e => { e.addEventListener('input', build); e.addEventListener('change', build); });
 		spd.addEventListener('input', build);
 		build();
 		return h('section', { class: 'card' },
@@ -289,6 +290,7 @@
 			targetBar(t),
 			h('label', { class: 'fld' }, h('span', {}, 'Where the text goes'), pos),
 			h('label', { class: 'fld' }, h('span', {}, 'Message'), t1),
+			h('label', { class: 'fld' }, h('span', {}, 'Text size'), ts),
 			h('label', { class: 'fld' }, d1lab, d1),
 			h('label', { class: 'gmcol' }, c1, c1lab),
 			...line2,
@@ -1758,7 +1760,7 @@
 	}
 	// v94: the movement of the picture / text and the background effect are two separate choices
 	const GM_FX = [['still', 'Still'], ['blink', 'Blink'], ['pulse', 'Pulse'], ['rainbow', 'Rainbow colours'], ['bounce', 'Bounce'], ['shake', 'Shake'],
-		['slide', 'Slide across'], ['grow', 'Grow'], ['shine', 'Shine']];
+		['slide', 'Slide to the left'], ['slider', 'Slide to the right'], ['slideup', 'Slide upwards'], ['slidedown', 'Slide downwards'], ['grow', 'Grow'], ['shine', 'Shine']];
 	const GM_BG = [['', 'Nothing'], ['snow', 'Falling snow'], ['stars', 'Twinkling stars'], ['confetti', 'Confetti'], ['fireworks', 'Fireworks'],
 		['hearts', 'Rising hearts'], ['fire', 'Flames'], ['bats', 'Flying bats'], ['sparkle', 'Sparkles']];
 	const BAT = ['10001', '11011', '01110'];
@@ -1818,8 +1820,23 @@
 		if (two) tp0 = 'top';
 		const has = sprites.length > 0, tpos = glyphs.length ? tp0 : 'none';
 		const vert = tpos === 'left' || tpos === 'right';
+		// v102: the slides go in 4 directions; for a text on its own the slide is the direction of the lines
+		const SLIDE = { slide: 'left', slider: 'right', slideup: 'up', slidedown: 'down' }, isSlide = fx in SLIDE;
+		if (isSlide && fx !== 'slide' && (!has || tpos === 'middle')) { if (!o.dir1) o.dir1 = vert && SLIDE[fx] !== 'up' && SLIDE[fx] !== 'down' ? 'up' : SLIDE[fx]; if (!o.dir2) o.dir2 = SLIDE[fx]; }
 		// text: bigger letters when there is no picture (or it goes over the picture); vertical text = letters one under the other
-		const tScale = !two && (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
+		// v102: o.tsize = 1 | 2 | 3 (letter size) or 'auto' (the biggest that fits, by the way the line moves:
+		// across = as tall as fits, still / up / down = as wide as fits); none = as before
+		const len1 = glyphs.length, len2 = glyphs2.length;
+		const autoS = (len, d, hAvail) => {
+			const byH = Math.max(1, Math.floor((hAvail + 1) / 6));
+			if (vert) return d === 'up' || d === 'down' ? Math.max(1, Math.floor(W / 6)) : Math.max(1, Math.min(Math.floor(W / 4), Math.floor((H + 1) / (len * 6))));
+			return d === 'left' || d === 'right' ? byH : Math.max(1, Math.min(byH, Math.floor((W + 1) / (len * 4))));
+		};
+		const fixS = v => Math.max(1, Math.min(4, +v || 1));
+		const hEach = two ? Math.floor((H - (has ? 0 : 1)) / 2) : H;
+		const tScale = o.tsize === 'auto' && len1 ? (has && tpos !== 'middle' ? 1 : autoS(len1, o.dir1, hEach)) : o.tsize ? fixS(o.tsize)
+			: !two && (!has || tpos === 'middle') && H >= 12 && !vert ? Math.max(1, Math.floor(Math.min(H / 8, W / 12))) : 1;
+		const s2 = !two ? 1 : o.tsize === 'auto' ? (has ? 1 : autoS(len2, o.dir2, hEach)) : o.tsize ? fixS(o.tsize) : 1;
 		const tw = vert ? 3 * tScale : glyphs.length ? glyphs.length * 4 * tScale - tScale : 0;
 		const th = vert ? (glyphs.length ? glyphs.length * 6 * tScale - tScale : 0) : 5 * tScale;
 		const scroll = vert ? th > H : tw > W;
@@ -1835,12 +1852,14 @@
 		if (vert && !scroll) ty = Math.floor((H - th) / 2);
 		if (!vert && !scroll) tx = Math.floor((W - tw) / 2);
 		// the second line, at the bottom
-		const tw2 = glyphs2.length ? glyphs2.length * 4 - 1 : 0, scroll2 = tw2 > W, ty2 = H - 5 - gap, tx2 = Math.floor((W - tw2) / 2);
+		const tw2 = glyphs2.length ? glyphs2.length * 4 * s2 - s2 : 0, th2 = 5 * s2, scroll2 = tw2 > W, ty2 = H - th2 - gap, tx2 = Math.floor((W - tw2) / 2);
 		// a line longer than the matrix cannot stand still: it goes to the left instead (so it can be read)
 		if (o.dir1 === 'stay' && scroll) o.dir1 = vert ? 'up' : 'left';
 		if (o.dir2 === 'stay' && scroll2) o.dir2 = 'left';
-		if (two && !has && H >= 18) ty = Math.max(gap, Math.floor(H / 2) - 6);   // no picture: the two lines closer to the middle
-		const ty2b = two && !has && H >= 18 ? Math.floor(H / 2) + 1 : ty2;
+		// no picture: the two lines together in the middle when there is room (else one at the top, one at the bottom)
+		const pair = two && !has && H >= th + th2 + 4;
+		if (pair) ty = Math.floor((H - th - th2 - 2) / 2);
+		const ty2b = pair ? ty + th + 2 : ty2;
 		if (two && has) area.h = Math.max(4, ty2 - 1 - area.y);
 		// each picture in its own cell (side by side, or one under the other in a tall area), fitted with whole pixels when it grows
 		const n = sprites.length, across = area.w >= area.h;
@@ -1881,7 +1900,10 @@
 		});
 		const groupW = n ? Math.max(...boxes.map(b => b.x + b.dw)) - Math.min(...boxes.map(b => b.x)) : 0;
 		const groupX = n ? Math.min(...boxes.map(b => b.x)) : 0;
+		const groupY = n ? Math.min(...boxes.map(b => b.y)) : 0, groupH = n ? Math.max(...boxes.map(b => b.y + b.dh)) - groupY : 0;
 		let N = { still: 1, blink: 8, pulse: 24, rainbow: 24, bounce: 16, shake: 12, slide: n ? W + groupW : vert ? H + th : W + Math.max(tw, tw2), grow: 20, shine: 24 }[fx] || 16;
+		if (fx === 'slider') N = n ? W + groupW : W + Math.max(tw, tw2);
+		if (fx === 'slideup' || fx === 'slidedown') N = n ? H + groupH : H + Math.max(th, th2 || 0);
 		const bgN = { snow: H * 2, stars: 24, confetti: H * 2, fireworks: 32, hearts: H + 6, fire: 16, bats: W + 6, sparkle: 16 }[bgfx] || 0;
 		if (bgN) N = N <= 1 ? bgN : Math.max(N, bgN);
 		// animated pictures: at least one full run of their own animation (at most 64 frames)
@@ -1894,7 +1916,7 @@
 		// v101: a direction chosen for a line makes it travel on its own (once per loop): 'left' / 'right' across,
 		// 'up' / 'down' from one edge to the other; 'stay' = still. With no direction given it works as before.
 		const trav = (d, w, hh) => !d || d === 'stay' ? 0 : d === 'up' || d === 'down' ? H + hh + 1 : vert ? 0 : W + w + 1;
-		N = Math.max(N, trav(o.dir1, tw, th), two ? trav(o.dir2, tw2, 5) : 0);
+		N = Math.max(N, trav(o.dir1, tw, th), two ? trav(o.dir2, tw2, th2) : 0);
 		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
 		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * Math.max(1, W - 5)), R() * (H + 6)]);
 		const MULTI = [[255, 42, 42], [255, 210, 63], [57, 211, 83], [43, 183, 255], [155, 92, 255], [255, 79, 216], [255, 122, 26]];
@@ -1932,6 +1954,9 @@
 				const ph = (tt + (o.turns && n > 1 && (fx === 'bounce' || fx === 'pulse') ? j / n : 0)) % 1;
 				let { dx, dy, sc, mul } = motion(ph, o.turns ? j : 0);
 				if (fx === 'slide') dx = W - groupX - Math.round(tt * (W + groupW));
+				if (fx === 'slider') dx = Math.round(tt * (W + groupW)) - groupX - groupW;
+				if (fx === 'slideup') dy = H - groupY - Math.round(tt * (H + groupH));
+				if (fx === 'slidedown') dy = Math.round(tt * (H + groupH)) - groupY - groupH;
 				const band = (tt * (W + H + 8)) - 4, sp = b.sp, cur = frameAt(sp.px, msAt(i));
 				for (let y = 0; y < b.dh; y++) for (let x = 0; x < b.dw; x++) {
 					let sxp = x, syp = y;
@@ -1942,7 +1967,7 @@
 					if (fx === 'shine') { const d = Math.abs((b.x + x) + (b.y + y) - band); if (d < 2.5) { const a = 0.75 * (1 - d / 2.5); c = c.map(v => v + (255 - v) * a | 0); } }
 					if (mul !== 1) c = c.map(v => v * mul | 0);
 					const px = b.x + x + dx, py = b.y + y + dy;
-					if (b.clip && fx !== 'slide' && (px < b.clip.x0 || py < b.clip.y0 || px >= b.clip.x1 || py >= b.clip.y1)) continue;   // edges cut
+					if (b.clip && !isSlide && (px < b.clip.x0 || py < b.clip.y0 || px >= b.clip.x1 || py >= b.clip.y1)) continue;   // edges cut
 					put(px, py, c);
 				}
 			});
@@ -1976,8 +2001,9 @@
 				if (two) {
 					// the bottom line goes the other way when sliding across
 					const ud2 = o.dir2 === 'up' || o.dir2 === 'down';
-					const x2 = (d2 === 'stay' || ud2 ? tx2 : o.dir2 === 'left' || o.dir2 === 'right' ? slideX(tw2, d2) : scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = (ud2 ? upDown(o.dir2, 5, ty2b) : ty2b) + m.dy;
-					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') { const px = x2 + gi * 4 + gx, py = y2 + gy; put(px, py, tc(gi + 3, px, py, o.c2)); } });
+					const x2 = (d2 === 'stay' || ud2 ? tx2 : o.dir2 === 'left' || o.dir2 === 'right' ? slideX(tw2, d2) : scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = (ud2 ? upDown(o.dir2, th2, ty2b) : ty2b) + m.dy;
+					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1')
+						for (let a = 0; a < s2; a++) for (let b2 = 0; b2 < s2; b2++) { const px = x2 + gi * 4 * s2 + gx * s2 + a, py = y2 + gy * s2 + b2; put(px, py, tc(gi + 3, px, py, o.c2)); } });
 				}
 			}
 			frames.push(f);

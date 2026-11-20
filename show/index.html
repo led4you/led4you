@@ -135,7 +135,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=26"></script>
+<script src="../studio.js?v=27"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -358,7 +358,9 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	// ---- v16: animate the picture or the drawing (the GIF is made on this phone, like "Make a GIF" in the app) ----
 	const GM = window.L4YStudio && L4YStudio.gm;
 	const ANIMS = [['orig', 'Como está'], ['bounce', '🦘 Saltar'], ['rainbow', '🌈 Arco-íris'], ['pulse', '💓 Pulsar'], ['blink', '💡 Piscar'], ['shake', '🫨 Tremer'],
-		['slide', '➡️ Atravessar'], ['grow', '🔍 Crescer'], ['shine', '✨ Brilho']];
+		['slide', '⬅️ Atravessar para a esquerda'], ['slider', '➡️ Atravessar para a direita'], ['slideup', '⬆️ Atravessar para cima'], ['slidedown', '⬇️ Atravessar para baixo'], ['grow', '🔍 Crescer'], ['shine', '✨ Brilho']];
+	// the bridge (v16) knows the movement 'slide': the 4 slides go to it with that name (the GIF itself is made here)
+	const fxMeta = fx => /^slide/.test(fx) ? 'slide' : fx;
 	// v16: the background effect is a choice of its own (snow behind a moving text…)
 	const BGS = [['', 'Nenhum'], ['snow', '❄️ Neve'], ['stars', '⭐ Estrelas'], ['confetti', '🎊 Confetes'], ['fireworks', '🎆 Fogo de artifício'], ['hearts', '💖 Corações'],
 		['fire', '🔥 Chamas'], ['bats', '🦇 Morcegos'], ['sparkle', '🎇 Faíscas']];
@@ -421,14 +423,15 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 
 	// ---- v16: how the message is shown: scrolling (as always, by the lights), or on top / in the middle / at the bottom,
 	// or two lines, with an animation (then it goes as a GIF made on this phone, like the pictures) ----
-	const txtS = { style: 'scroll', fx: 'still', bgfx: '', bg: 0, spd: 90, t2: '', c2: URL_THEME === 'xm' ? 5 : 7, d1: 'stay', d2: 'stay', frames: [], bytes: null };
+	const txtS = { style: 'scroll', fx: 'still', bgfx: '', bg: 0, spd: 90, t2: '', c2: URL_THEME === 'xm' ? 5 : 7, d1: 'stay', d2: 'stay', ts: 'auto', frames: [], bytes: null };
 	if (GM) {
 		const box = $('txtStyle'), mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
 		const styles = mk('div', 'chips'), fxs = mk('div', 'chips'), bgfxs = mk('div', 'chips'), spd = mk('div', 'chips'), bg = mk('div', 'swatches'), c2 = mk('div', 'swatches');
+		const tsz = mk('div', 'chips');
 		const d1 = mk('div', 'chips'), d2 = mk('div', 'chips'), d1lab = mk('div', 'lab', 'A linha de cima'), d2lab = mk('div', 'lab', 'A linha de baixo'), c2lab = mk('div', 'lab', 'Cor da linha de baixo');
 		const t2 = mk('input'); t2.type = 'text'; t2.maxLength = 40; t2.autocomplete = 'off'; t2.placeholder = 'Texto da linha de baixo';
 		const t2lab = mk('label', 'lab', 'Linha de baixo'), cv = mk('canvas'), pvw = mk('div', 'apv'), info = mk('p', 'note ainfo'); pvw.append(cv);
-		const extra = [mk('div', 'lab', 'Movimento do texto'), fxs, mk('div', 'lab', 'Efeito de fundo'), bgfxs, d1lab, d1, d2lab, d2, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw];
+		const extra = [mk('div', 'lab', 'Tamanho das letras'), tsz, mk('div', 'lab', 'Movimento do texto'), fxs, mk('div', 'lab', 'Efeito de fundo'), bgfxs, d1lab, d1, d2lab, d2, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw];
 		const row = (el, list, cur, on) => el.replaceChildren(...list.map(([v, n]) => { const b = mk('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); return b; }));
 		const draw = () => {
 			row(styles, [['scroll', '➡️ A passar (normal)'], ['top', '⬆️ Em cima'], ['middle', '⏺️ No meio'], ['bottom', '⬇️ Em baixo'], ['left', '⬅️ De lado, à esquerda'], ['right', '➡️ De lado, à direita']].concat(cfg.free ? [['two', '↕️ Duas linhas']] : []), txtS.style, v => { txtS.style = v; draw(); txtS.build(); });
@@ -436,6 +439,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			row(bgfxs, BGS, txtS.bgfx, v => { txtS.bgfx = v; draw(); txtS.build(); });
 			row(spd, SPEEDS.map(([n, ms]) => [ms, n]), txtS.spd, v => { txtS.spd = v; draw(); txtS.build(); });
 			const DIRS = [['stay', '⏸️ Fica parado'], ['left', '⬅️ Para a esquerda'], ['right', '➡️ Para a direita'], ['up', '⬆️ Para cima'], ['down', '⬇️ Para baixo']];
+			row(tsz, [['auto', '🪄 Automático'], ['1', 'Pequeno'], ['2', 'Médio'], ['3', 'Grande']], txtS.ts, v => { txtS.ts = v; draw(); txtS.build(); });
 			row(d1, DIRS, txtS.d1, v => { txtS.d1 = v; draw(); txtS.build(); });
 			row(d2, DIRS, txtS.d2, v => { txtS.d2 = v; draw(); txtS.build(); });
 			const on = txtS.style !== 'scroll', two = txtS.style === 'two';
@@ -457,7 +461,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			if (!t1 && !l2) { info.textContent = 'Escreve ou escolhe uma mensagem.'; return; }
 			if (isBad(t1) || (l2 && isBad(l2))) { info.textContent = 'Essa mensagem não pode aparecer. Escolhe outra!'; return; }
 			const [w, h] = sizeNow();
-			txtS.frames = GM.frames({ W: w, H: h, delay: txtS.spd, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, bgfx: txtS.bgfx, c1: rgb(txtCol), c2: rgb(txtS.c2), dir1: txtS.d1, dir2: txtS.d2, bg: rgb(txtS.bg) });
+			txtS.frames = GM.frames({ W: w, H: h, delay: txtS.spd, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, bgfx: txtS.bgfx, c1: rgb(txtCol), c2: rgb(txtS.c2), dir1: txtS.d1, dir2: txtS.d2, tsize: txtS.ts, bg: rgb(txtS.bg) });
 			txtS.bytes = GM.encode(txtS.frames, w, h, txtS.spd);
 			if (txtS.bytes.length > 60000) { info.textContent = 'Fica grande demais para as luzes. Escolhe um texto mais curto.'; txtS.bytes = null; }
 		};
@@ -535,7 +539,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 				txtS.build();
 				if (!txtS.bytes) { say('Não foi possível preparar a mensagem. Escolhe outra ou um texto mais curto.', 'err'); return; }
 				const [w, h] = sizeNow();
-				textGif = { meta: { k: 'gifx', z: face, w, h, fx: txtS.fx, t, t2: txtS.style === 'two' ? txtS.t2.trim().slice(0, 40) : '', src: 'texto' }, bytes: txtS.bytes };
+				textGif = { meta: { k: 'gifx', z: face, w, h, fx: fxMeta(txtS.fx), t, t2: txtS.style === 'two' ? txtS.t2.trim().slice(0, 40) : '', src: 'texto' }, bytes: txtS.bytes };
 			}
 		} else if (tab === 'gif') {
 			if (!gif) { say('Escolhe primeiro uma imagem.', 'err'); return; }
@@ -562,7 +566,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			anim.build();
 			if (!anim.bytes) { say('Não foi possível fazer a animação. Escolhe outra ou um texto mais curto.', 'err'); return; }
 			const [w, h] = sizeNow();
-			const meta = { k: 'gifx', z: face, w, h, fx: anim.fx, t: anim.txt.trim().slice(0, 20), src: tab === 'gif' ? gifs3.join(' + ') : 'desenho' };
+			const meta = { k: 'gifx', z: face, w, h, fx: fxMeta(anim.fx), t: anim.txt.trim().slice(0, 20), src: tab === 'gif' ? gifs3.join(' + ') : 'desenho' };
 			url = RELAY + TOPIC + '?filename=cubo.gif&message=' + encodeURIComponent(JSON.stringify(meta));
 			req = { method: 'POST', body: new Blob([anim.bytes]) };
 		}
