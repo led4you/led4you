@@ -99,3 +99,4 @@ A página dos visitantes (`show/index.html`) só precisa de push.
 - App v103 / cubo: "Fica parado" é sempre parado. Linha um pouco comprida demais: letras juntas (sem espaço), uma sim uma não mais escura; se nem assim couber fica cortada e aparece um aviso.
 - App v104: GIFs para matrizes de qualquer tamanho. Criar um GIF: 16×16, a tua matriz (até 128×128), 32×32, 64×64. Texto com animação: feito ao tamanho da matriz (máx. 128 de lado); se passar de 64 KB faz-se a metade/um quarto e as luzes aumentam. Limite real: 64 KB por GIF e memória/LEDs da placa.
 - App v105: sem tamanhos fixos de exemplo. Criar um GIF: 16×16, a tua matriz (qualquer tamanho), metade dela (mesma forma), 32×32. Texto: tamanho da matriz; acima de ~16 384 pontos começa já mais pequeno (mesma forma) e reduz a metade até caber em 64 KB.
+- Firmware v105 publicado (2026-11-20): Studio Wi-Fi = app v106. C3 1 556 560 bytes, ESP32 1 618 816.
