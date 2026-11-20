@@ -293,7 +293,7 @@
 		};
 		// typing: wait a moment before making the GIF again (big matrices take longer)
 		let typing = 0;
-		[t1, t2].forEach(e => e.addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(build, W0 * H0 > 1024 ? 350 : 60); }));
+		[t1, t2].forEach(e => e.addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(build, W0 * H0 > 1024 ? 350 : 60); if (t1.value.trim() || t2.value.trim()) sendBtn.disabled = false; }));
 		[pos, d1, d2, fx, bgfx, ts, c1, c2, bg].forEach(e => { e.addEventListener('input', build); e.addEventListener('change', build); });
 		spd.addEventListener('input', build);
 		build();
