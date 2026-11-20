@@ -51,6 +51,7 @@
 		['Big', 'Grande', 'Grande', 'Grand'],
 		['Very big', 'Muito grande', 'Muy grande', 'Très grand'],
 		['The text does not fit standing still: it is cut at the sides. Use a shorter word or make it move.', 'O texto não cabe parado: fica cortado dos lados. Usa uma palavra mais curta ou põe-no a mexer.', 'El texto no cabe quieto: se corta por los lados. Usa una palabra más corta o ponlo en movimiento.', 'Le texte ne tient pas immobile : il est coupé sur les côtés. Utilisez un mot plus court ou faites-le bouger.'],
+		['Made smaller to stay under 64 KB: the lights enlarge it to your matrix.', 'Feito mais pequeno para ficar abaixo de 64 KB: as luzes aumentam-no para a tua matriz.', 'Hecho más pequeño para quedar por debajo de 64 KB: las luces lo amplían a tu matriz.', 'Réduit pour rester sous 64 Ko : les lumières l’agrandissent à votre matrice.'],
 		['Background effect', 'Efeito de fundo', 'Efecto de fondo', 'Effet de fond'],
 		['Nothing', 'Nenhum', 'Ninguno', 'Aucun'],
 		['Twinkling stars', 'Estrelas a piscar', 'Estrellas que brillan', 'Étoiles scintillantes'],

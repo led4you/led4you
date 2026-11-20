@@ -211,7 +211,11 @@
 		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'stay', d2: 'stay', fx: 'still', bgfx: 'snow', bg: '#000000', spd: 90, ts: 'auto' };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yTextGif') || '{}')); } catch (e) {}
 		const save = () => { try { localStorage.setItem('l4yTextGif', JSON.stringify(o)); } catch (e) {} };
-		const W = inf.mw && inf.mh ? Math.min(64, inf.mw) : 16, H = inf.mw && inf.mh ? Math.min(64, inf.mh) : 16;
+		// v104: made at the size of the matrix (any size; above 128 it keeps the shape at 128 at most). If the GIF goes
+		// over the 64 KB the lights accept, it is made smaller (half, then a quarter…) and the lights enlarge it
+		const MW = inf.mw && inf.mh ? inf.mw : 16, MH = inf.mw && inf.mh ? inf.mh : 16, k0 = Math.min(1, 128 / Math.max(MW, MH));
+		const W0 = Math.max(8, Math.round(MW * k0)), H0 = Math.max(8, Math.round(MH * k0));
+		let W = W0, H = H0;
 		const t1 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'FELIZ', value: o.t1 });
 		const t2 = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'NATAL', value: o.t2 });
 		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Colour of the top line' });
@@ -224,7 +228,7 @@
 		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
 		const ts = sel([['auto', 'Automatic (as big as fits)'], ['1', 'Small'], ['2', 'Medium'], ['3', 'Big'], ['4', 'Very big']], o.ts, 'Text size');
 		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
-		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), warn = h('div', { class: 'note warnline' }), prog = h('div', { class: 'note' });
+		const cv = h('canvas', { class: 'txtpv gmpv', 'aria-label': 'Preview of the text' }), info = h('div', { class: 'note' }), warn = h('div', { class: 'note warnline' }), smallNote = h('div', { class: 'note' }), prog = h('div', { class: 'note' });
 		const sendBtn = h('button', { class: 'btn primary', type: 'button' }, 'Show on the lights');
 		const line2 = [h('label', { class: 'fld' }, h('span', {}, 'Bottom line'), t2), h('label', { class: 'fld' }, h('span', {}, 'The bottom line goes'), d2),
 			h('label', { class: 'gmcol' }, c2, h('span', {}, 'Colour of the bottom line'))];
@@ -243,11 +247,16 @@
 			c1lab.textContent = two ? 'Colour of the top line' : 'Text colour';
 			bytes = null; frames = [];
 			if (!o.t1.trim() && !(two && o.t2.trim())) { info.textContent = 'Type a message first.'; sendBtn.disabled = true; return; }
-			frames = gmFrames({ W, H, delay: o.spd, sprites: [], fx: o.fx, bgfx: o.bgfx, text: o.t1, text2: two ? o.t2 : '', tpos: two ? 'top' : o.pos,
-				c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, tsize: o.ts, bg: hexToRgb(o.bg) });
-			bytes = gifEncode(frames, W, H, o.spd);
+			for (let k = 1; ; k *= 2) {
+				W = Math.max(8, Math.round(W0 / k)); H = Math.max(8, Math.round(H0 / k));
+				frames = gmFrames({ W, H, delay: o.spd, sprites: [], fx: o.fx, bgfx: o.bgfx, text: o.t1, text2: two ? o.t2 : '', tpos: two ? 'top' : o.pos,
+					c1: hexToRgb(o.c1), c2: hexToRgb(o.c2), dir1: o.d1, dir2: o.d2, tsize: o.ts, bg: hexToRgb(o.bg) });
+				bytes = gifEncode(frames, W, H, o.spd);
+				if (bytes.length <= 65536 || (W <= 16 && H <= 16)) break;
+			}
 			info.textContent = W + '×' + H + ', ' + frames.length + (frames.length === 1 ? ' frame' : ' frames') + ', ' + (bytes.length / 1024).toFixed(1) + ' KB' + (bytes.length > 65536 ? ' (too big: the limit is 64 KB, use a smaller size or a shorter text)' : '');
 			sendBtn.disabled = bytes.length > 65536;
+			smallNote.textContent = W < W0 ? 'Made smaller to stay under 64 KB: the lights enlarge it to your matrix.' : '';
 			const cut = (txt, d) => d === 'stay' && txt.trim().length * 3 > (o.pos === 'left' || o.pos === 'right' ? 99 : W);
 			warn.textContent = cut(o.t1, o.d1) || (two && cut(o.t2, o.d2)) ? 'The text does not fit standing still: it is cut at the sides. Use a shorter word or make it move.' : '';
 		};
@@ -281,7 +290,9 @@
 			} catch (e) { prog.textContent = 'Could not send the text. If the lights are full, delete a GIF you no longer use.'; }
 			sendBtn.disabled = false;
 		};
-		[t1, t2].forEach(e => e.addEventListener('input', build));
+		// typing: wait a moment before making the GIF again (big matrices take longer)
+		let typing = 0;
+		[t1, t2].forEach(e => e.addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(build, W0 * H0 > 1024 ? 350 : 60); }));
 		[pos, d1, d2, fx, bgfx, ts, c1, c2, bg].forEach(e => { e.addEventListener('input', build); e.addEventListener('change', build); });
 		spd.addEventListener('input', build);
 		build();
@@ -300,7 +311,7 @@
 			h('label', { class: 'fld' }, h('span', {}, 'Background effect'), bgfx),
 			h('label', { class: 'gmcol' }, bg, h('span', {}, 'Background')),
 			h('div', { class: 'lab sp' }, 'Speed (time per frame)'), spd,
-			h('div', { class: 'gmpvwrap' }, cv), info, warn,
+			h('div', { class: 'gmpvwrap' }, cv), info, smallNote, warn,
 			h('div', { class: 'row' }, sendBtn), prog);
 	}
 
@@ -2026,9 +2037,11 @@
 		let sprites = [], frames = [], W = 16, H = 16, delay = 90, bytes = null;
 		const spCache = {};
 		const inf = t.info();
-		const sizes = [[16, 16]];
-		if (inf.mw && inf.mh && inf.mw <= 64 && inf.mh <= 64 && !(inf.mw === 16 && inf.mh === 16)) sizes.push([inf.mw, inf.mh]);
-		if (!sizes.some(s => s[0] === 32 && s[1] === 32)) sizes.push([32, 32]);
+		// v104: 16×16, the size of your matrix (any size up to 128×128), 32×32 and 64×64. A GIF smaller than the matrix
+		// is enlarged by the lights; the file must stay under 64 KB, so big sizes suit short animations
+		const sizes = [[16, 16]], mine = inf.mw && inf.mh && inf.mw <= 128 && inf.mh <= 128 ? [inf.mw, inf.mh] : null;
+		if (mine && !(mine[0] === 16 && mine[1] === 16)) sizes.push(mine);
+		[[32, 32], [64, 64]].forEach(z => { if (!sizes.some(s => s[0] === z[0] && s[1] === z[1])) sizes.push(z); });
 		const picSel = h('select', { 'aria-label': 'Picture' }, h('option', { value: '' }, 'No picture (only text and effect)'), h('option', { value: '*draw' }, 'My drawing'));
 		// v90: up to 3 pictures side by side (a candy cane and a tree…)
 		const pic2Sel = h('select', { 'aria-label': 'Second picture' }, h('option', { value: '' }, '— none —'), h('option', { value: '*draw' }, 'My drawing'));
@@ -2040,7 +2053,7 @@
 		// v99: several pictures move together (default) or take turns, as in the cube
 		const turnSel = h('select', { 'aria-label': 'The pictures move' }, [['0', 'At the same time'], ['1', 'Taking turns']].map(([v, n]) => h('option', { value: v }, n)));
 		const turnFld = h('label', { class: 'fld' }, h('span', {}, 'The pictures move'), turnSel);
-		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (i === 1 && sizes.length > 2 ? ' (your matrix)' : ''))));
+		const sizeSel = h('select', { 'aria-label': 'Size' }, sizes.map(([w, hh], i) => h('option', { value: String(i) }, w + '×' + hh + (mine && w === mine[0] && hh === mine[1] ? ' (your matrix)' : ''))));
 		const txt = h('input', { class: 'search', type: 'text', maxlength: '40', placeholder: 'Optional: a short text', value: o.txt || '' });
 		const c1 = h('input', { type: 'color', class: 'colbtn', value: o.c1, 'aria-label': 'Text and effect colour' });
 		const bg = h('input', { type: 'color', class: 'colbtn', value: o.bg, 'aria-label': 'Background colour' });
