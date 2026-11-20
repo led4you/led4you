@@ -39,6 +39,8 @@
 		['At the same time', 'Ao mesmo tempo', 'A la vez', 'En même temps'],
 		['Taking turns', 'À vez', 'Por turnos', 'À tour de rôle'],
 		['Stays still', 'Fica parado', 'Se queda quieto', 'Reste immobile'],
+		['Upwards', 'Para cima', 'Hacia arriba', 'Vers le haut'],
+		['Downwards', 'Para baixo', 'Hacia abajo', 'Vers le bas'],
 		['Background effect', 'Efeito de fundo', 'Efecto de fondo', 'Effet de fond'],
 		['Nothing', 'Nenhum', 'Ninguno', 'Aucun'],
 		['Twinkling stars', 'Estrelas a piscar', 'Estrellas que brillan', 'Étoiles scintillantes'],

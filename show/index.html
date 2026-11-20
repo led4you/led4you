@@ -135,7 +135,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="note" id="waitNote" hidden></p>
 </main>
 <script src="pal.js?v=13"></script>
-<script src="../studio.js?v=25"></script>
+<script src="../studio.js?v=26"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -421,7 +421,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 
 	// ---- v16: how the message is shown: scrolling (as always, by the lights), or on top / in the middle / at the bottom,
 	// or two lines, with an animation (then it goes as a GIF made on this phone, like the pictures) ----
-	const txtS = { style: 'scroll', fx: 'still', bgfx: '', bg: 0, spd: 90, t2: '', c2: URL_THEME === 'xm' ? 5 : 7, d1: 'left', d2: 'right', frames: [], bytes: null };
+	const txtS = { style: 'scroll', fx: 'still', bgfx: '', bg: 0, spd: 90, t2: '', c2: URL_THEME === 'xm' ? 5 : 7, d1: 'stay', d2: 'stay', frames: [], bytes: null };
 	if (GM) {
 		const box = $('txtStyle'), mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
 		const styles = mk('div', 'chips'), fxs = mk('div', 'chips'), bgfxs = mk('div', 'chips'), spd = mk('div', 'chips'), bg = mk('div', 'swatches'), c2 = mk('div', 'swatches');
@@ -431,11 +431,11 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		const extra = [mk('div', 'lab', 'Movimento do texto'), fxs, mk('div', 'lab', 'Efeito de fundo'), bgfxs, d1lab, d1, d2lab, d2, mk('div', 'lab', 'Cor do fundo'), bg, mk('div', 'lab', 'Velocidade'), spd, pvw];
 		const row = (el, list, cur, on) => el.replaceChildren(...list.map(([v, n]) => { const b = mk('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); return b; }));
 		const draw = () => {
-			row(styles, [['scroll', '➡️ A passar (normal)'], ['top', '⬆️ Em cima'], ['middle', '⏺️ No meio'], ['bottom', '⬇️ Em baixo']].concat(cfg.free ? [['two', '↕️ Duas linhas']] : []), txtS.style, v => { txtS.style = v; draw(); txtS.build(); });
+			row(styles, [['scroll', '➡️ A passar (normal)'], ['top', '⬆️ Em cima'], ['middle', '⏺️ No meio'], ['bottom', '⬇️ Em baixo'], ['left', '⬅️ De lado, à esquerda'], ['right', '➡️ De lado, à direita']].concat(cfg.free ? [['two', '↕️ Duas linhas']] : []), txtS.style, v => { txtS.style = v; draw(); txtS.build(); });
 			row(fxs, [['still', 'Parado']].concat(ANIMS.slice(1)), txtS.fx, v => { txtS.fx = v; draw(); txtS.build(); });
 			row(bgfxs, BGS, txtS.bgfx, v => { txtS.bgfx = v; draw(); txtS.build(); });
 			row(spd, SPEEDS.map(([n, ms]) => [ms, n]), txtS.spd, v => { txtS.spd = v; draw(); txtS.build(); });
-			const DIRS = [['stay', '⏸️ Fica parado'], ['left', '⬅️ Vai para a esquerda'], ['right', '➡️ Vai para a direita']];
+			const DIRS = [['stay', '⏸️ Fica parado'], ['left', '⬅️ Para a esquerda'], ['right', '➡️ Para a direita'], ['up', '⬆️ Para cima'], ['down', '⬇️ Para baixo']];
 			row(d1, DIRS, txtS.d1, v => { txtS.d1 = v; draw(); txtS.build(); });
 			row(d2, DIRS, txtS.d2, v => { txtS.d2 = v; draw(); txtS.build(); });
 			const on = txtS.style !== 'scroll', two = txtS.style === 'two';

@@ -208,7 +208,7 @@
 	// each line with its colour and side, a movement and a background effect (the same as in the cube) ----------
 	function textGifCard(t, toast) {
 		const inf = t.info();
-		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'left', d2: 'right', fx: 'slide', bgfx: 'snow', bg: '#000000', spd: 90 };
+		let o = { t1: '', t2: '', pos: 'middle', c1: '#ff2a2a', c2: '#2bb7ff', d1: 'stay', d2: 'stay', fx: 'still', bgfx: 'snow', bg: '#000000', spd: 90 };
 		try { Object.assign(o, JSON.parse(localStorage.getItem('l4yTextGif') || '{}')); } catch (e) {}
 		const save = () => { try { localStorage.setItem('l4yTextGif', JSON.stringify(o)); } catch (e) {} };
 		const W = inf.mw && inf.mh ? Math.min(64, inf.mw) : 16, H = inf.mw && inf.mh ? Math.min(64, inf.mh) : 16;
@@ -218,8 +218,8 @@
 		const c2 = h('input', { type: 'color', class: 'colbtn', value: o.c2, 'aria-label': 'Colour of the bottom line' });
 		const bg = h('input', { type: 'color', class: 'colbtn', value: o.bg, 'aria-label': 'Background colour' });
 		const sel = (list, v, label) => { const s = h('select', { 'aria-label': label }, list.map(([k, n]) => h('option', { value: k }, n))); s.value = v; return s; };
-		const pos = sel([['top', 'On top'], ['middle', 'In the middle'], ['bottom', 'At the bottom'], ['two', 'Two lines']], o.pos, 'Where the text goes');
-		const DIRS2 = [['stay', 'Stays still'], ['left', 'To the left'], ['right', 'To the right']];
+		const pos = sel([['top', 'On top'], ['middle', 'In the middle'], ['bottom', 'At the bottom'], ['two', 'Two lines'], ['left', 'On the left (letters one under the other)'], ['right', 'On the right (letters one under the other)']], o.pos, 'Where the text goes');
+		const DIRS2 = [['stay', 'Stays still'], ['left', 'To the left'], ['right', 'To the right'], ['up', 'Upwards'], ['down', 'Downwards']];
 		const d1 = sel(DIRS2, o.d1, 'Where the top line goes'), d2 = sel(DIRS2, o.d2, 'Where the bottom line goes');
 		const fx = sel(GM_FX, o.fx, 'Movement'), bgfx = sel(GM_BG, o.bgfx, 'Background effect');
 		const spd = track(h('input', { type: 'range', min: '30', max: '250', value: String(o.spd), 'aria-label': 'Frame time' }));
@@ -234,6 +234,10 @@
 			save();
 			const two = o.pos === 'two';
 			line2.forEach(e => e.hidden = !two);
+			// letters one under the other (sides): the line can stay or go up / down, not across
+			const side = o.pos === 'left' || o.pos === 'right';
+			[...d1.options].forEach(op => op.disabled = side && (op.value === 'left' || op.value === 'right'));
+			if (side && (o.d1 === 'left' || o.d1 === 'right')) { d1.value = o.d1 = 'up'; }
 			d1lab.textContent = two ? 'The top line goes' : 'The text goes';
 			c1lab.textContent = two ? 'Colour of the top line' : 'Text colour';
 			bytes = null; frames = [];
@@ -1800,6 +1804,7 @@
 	// o = { W, H, sprites: [{ w, h, px: [[r,g,b] | null] }] (up to 3, side by side), fx, text, text2 (a 2nd line at the bottom, colour c2), dir1 / dir2 ('left' | 'right': where each line goes), tpos: 'bottom' | 'top' | 'left' | 'right' | 'middle',
 	//       c1: [r,g,b], bg: [r,g,b] }   (o.sprite, one picture, still works)
 	function gmFrames(o) {
+		o = Object.assign({}, o);
 		const W = o.W, H = o.H, BG = o.bg, C1 = o.c1, delay = o.delay || 90;
 		// the old single list had the backgrounds among the movements: they still work
 		let fx = o.fx, bgfx = o.bgfx || '';
@@ -1831,6 +1836,9 @@
 		if (!vert && !scroll) tx = Math.floor((W - tw) / 2);
 		// the second line, at the bottom
 		const tw2 = glyphs2.length ? glyphs2.length * 4 - 1 : 0, scroll2 = tw2 > W, ty2 = H - 5 - gap, tx2 = Math.floor((W - tw2) / 2);
+		// a line longer than the matrix cannot stand still: it goes to the left instead (so it can be read)
+		if (o.dir1 === 'stay' && scroll) o.dir1 = vert ? 'up' : 'left';
+		if (o.dir2 === 'stay' && scroll2) o.dir2 = 'left';
 		if (two && !has && H >= 18) ty = Math.max(gap, Math.floor(H / 2) - 6);   // no picture: the two lines closer to the middle
 		const ty2b = two && !has && H >= 18 ? Math.floor(H / 2) + 1 : ty2;
 		if (two && has) area.h = Math.max(4, ty2 - 1 - area.y);
@@ -1881,8 +1889,12 @@
 		const N0 = animMs ? Math.max(2, Math.round(animMs / delay)) : 0;
 		if (animMs) N = Math.min(64, Math.max(N, N0));
 		const msAt = i => N === N0 ? i * animMs / N0 : i * delay;   // when the GIF is exactly one run of the animation, it loops without a jump
-		if (scroll) N = Math.max(N, (vert ? th + H : tw + W) + 2);
-		if (scroll2) N = Math.max(N, tw2 + W + 2);
+		if (scroll && !o.dir1) N = Math.max(N, (vert ? th + H : tw + W) + 2);
+		if (scroll2 && !o.dir2) N = Math.max(N, tw2 + W + 2);
+		// v101: a direction chosen for a line makes it travel on its own (once per loop): 'left' / 'right' across,
+		// 'up' / 'down' from one edge to the other; 'stay' = still. With no direction given it works as before.
+		const trav = (d, w, hh) => !d || d === 'stay' ? 0 : d === 'up' || d === 'down' ? H + hh + 1 : vert ? 0 : W + w + 1;
+		N = Math.max(N, trav(o.dir1, tw, th), two ? trav(o.dir2, tw2, 5) : 0);
 		const R = rnd(7), flakes = Array.from({ length: Math.max(6, Math.round(W * H / 28)) }, () => [Math.floor(R() * W), R() * H, R() < .5 ? 1 : 2]);
 		const hearts = Array.from({ length: Math.max(3, Math.round(W / 6)) }, () => [Math.floor(R() * Math.max(1, W - 5)), R() * (H + 6)]);
 		const MULTI = [[255, 42, 42], [255, 210, 63], [57, 211, 83], [43, 183, 255], [155, 92, 255], [255, 79, 216], [255, 122, 26]];
@@ -1951,8 +1963,10 @@
 				const scrollX = (len, d) => d === 'right' ? Math.round(i * (len + W) / N) - len : W - Math.round(i * (len + W) / N);
 				const d1 = o.dir1 || 'left', d2 = o.dir2 || (fx === 'slide' ? 'right' : 'left');
 				// v100: 'stay' = this line stands still (centred; a text longer than the matrix is cut)
-				const x0 = (d1 === 'stay' && !vert ? tx : scroll && !vert ? scrollX(tw, d1) : subj && fx === 'slide' && !vert ? slideX(tw, d1) : tx) + m.dx;
-				const y0 = (scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
+				const upDown = (d, hh, y) => d === 'up' ? H - Math.round(tt * (H + hh)) : d === 'down' ? Math.round(tt * (H + hh)) - hh : y;
+				const ud1 = o.dir1 === 'up' || o.dir1 === 'down', lr1 = !vert && (o.dir1 === 'left' || o.dir1 === 'right');
+				const x0 = (ud1 || (d1 === 'stay' && !vert) ? (vert ? tx : Math.floor((W - tw) / 2)) : lr1 ? slideX(tw, d1) : scroll && !vert ? scrollX(tw, d1) : subj && fx === 'slide' && !vert ? slideX(tw, d1) : tx) + m.dx;
+				const y0 = (ud1 ? upDown(o.dir1, th, ty) : d1 === 'stay' && vert ? Math.floor((H - th) / 2) : scroll && vert ? H - Math.round(i * (th + H) / N) : subj && fx === 'slide' && vert ? H - Math.round(tt * (H + th)) : ty) + m.dy;
 				const n1 = shown(glyphs.length);
 				glyphs.slice(0, n1).forEach((gl, gi) => {
 					const gx0 = vert ? x0 : x0 + gi * 4 * tScale, gy0 = vert ? y0 + gi * 6 * tScale : y0;
@@ -1961,7 +1975,8 @@
 				});
 				if (two) {
 					// the bottom line goes the other way when sliding across
-					const x2 = (d2 === 'stay' ? tx2 : scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = ty2b + m.dy;
+					const ud2 = o.dir2 === 'up' || o.dir2 === 'down';
+					const x2 = (d2 === 'stay' || ud2 ? tx2 : o.dir2 === 'left' || o.dir2 === 'right' ? slideX(tw2, d2) : scroll2 ? scrollX(tw2, d2) : subj && fx === 'slide' ? slideX(tw2, d2) : tx2) + m.dx, y2 = (ud2 ? upDown(o.dir2, 5, ty2b) : ty2b) + m.dy;
 					glyphs2.slice(0, shown(glyphs2.length)).forEach((gl, gi) => { for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < 3; gx++) if (gl[gy * 3 + gx] === '1') { const px = x2 + gi * 4 + gx, py = y2 + gy; put(px, py, tc(gi + 3, px, py, o.c2)); } });
 				}
 			}
